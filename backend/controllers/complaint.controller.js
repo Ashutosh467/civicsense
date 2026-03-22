@@ -1,4 +1,5 @@
-import db from "../config/db.js";
+import Complaint from "../models/complaint.model.js";
+import { getIO } from "../sockets/socket.js";
 
 /*
 =============================
@@ -7,7 +8,7 @@ CREATE COMPLAINT
 */
 export const createComplaint = async (req, res) => {
   try {
-    const complaintData = {
+    const newComplaint = await Complaint.create({
       callerNo: req.body.callerNo || "Unknown",
       issueType: req.body.issueType || "General",
       location: req.body.location || "Unknown",
@@ -15,14 +16,17 @@ export const createComplaint = async (req, res) => {
       emotion: req.body.emotion || "neutral",
       summary: req.body.summary || "",
       status: "pending",
-      time: new Date().toISOString(),
-    };
+    });
 
-    const docRef = await db.collection("complaints").add(complaintData);
+    try {
+      getIO().emit("newComplaint", newComplaint.toJSON());
+    } catch (e) {
+      console.error("Socket error on emit:", e.message);
+    }
 
     res.status(201).json({
       message: "Complaint created successfully",
-      id: docRef.id,
+      id: newComplaint.id,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -36,16 +40,7 @@ GET ALL COMPLAINTS
 */
 export const getComplaints = async (req, res) => {
   try {
-    const snapshot = await db
-      .collection("complaints")
-      .orderBy("time", "desc")
-      .get();
-
-    const complaints = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
+    const complaints = await Complaint.find({}).sort({ time: -1 });
     res.json(complaints);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -59,16 +54,13 @@ GET SINGLE COMPLAINT ⭐
 */
 export const getSingleComplaint = async (req, res) => {
   try {
-    const doc = await db.collection("complaints").doc(req.params.id).get();
+    const doc = await Complaint.findById(req.params.id);
 
-    if (!doc.exists) {
+    if (!doc) {
       return res.status(404).json({ message: "Complaint not found" });
     }
 
-    res.json({
-      id: doc.id,
-      ...doc.data(),
-    });
+    res.json(doc);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -89,10 +81,7 @@ export const updateComplaintStatus = async (req, res) => {
       });
     }
 
-    await db
-      .collection("complaints")
-      .doc(req.params.id)
-      .update({ status: req.body.status });
+    await Complaint.findByIdAndUpdate(req.params.id, { status: req.body.status });
 
     res.json({ message: "Status updated successfully" });
   } catch (error) {

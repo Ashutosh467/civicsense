@@ -1,4 +1,4 @@
-import db from "../config/db.js";
+import Complaint from "../models/complaint.model.js";
 
 /*
 ====================================
@@ -7,7 +7,7 @@ import db from "../config/db.js";
 */
 export const getDashboardSummary = async (req, res) => {
   try {
-    const snapshot = await db.collection("complaints").get();
+    const allComplaints = await Complaint.find({});
 
     let totalToday = 0;
     let pending = 0;
@@ -17,8 +17,7 @@ export const getDashboardSummary = async (req, res) => {
 
     const today = new Date().toDateString();
 
-    snapshot.forEach((doc) => {
-      const data = doc.data();
+    allComplaints.forEach((data) => {
 
       // total today
       if (new Date(data.time).toDateString() === today) {
@@ -60,12 +59,11 @@ export const getDashboardSummary = async (req, res) => {
 */
 export const getLocationInsights = async (req, res) => {
   try {
-    const snapshot = await db.collection("complaints").get();
+    const allComplaints = await Complaint.find({});
 
     const locationMap = {};
 
-    snapshot.forEach((doc) => {
-      const data = doc.data();
+    allComplaints.forEach((data) => {
       const location = data.location || "Unknown";
 
       if (!locationMap[location]) {

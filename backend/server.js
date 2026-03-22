@@ -15,10 +15,8 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-// ================================
-// FIREBASE INIT
-// ================================
-import "./config/db.js";
+import connectDB from "./config/db.js";
+connectDB();
 
 import complaintRoutes from "./routes/complaint.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
@@ -117,7 +115,7 @@ server.listen(PORT, () => {
   console.log(`
 🔥 CivicSense Backend Started
 🌐 Port: ${PORT}
-🔥 Database: Firebase Firestore
+🔥 Database: MongoDB
 📡 Realtime Enabled
 🔒 Smart CORS Enabled (Vercel + Localhost)
 🚀 Ready for Frontend
