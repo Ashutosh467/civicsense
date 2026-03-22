@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+/* Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #4a74d7;
+  color: white;
+}
+
+
+/* Fade Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-in-out;
+}
