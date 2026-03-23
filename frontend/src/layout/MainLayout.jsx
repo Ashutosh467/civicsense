@@ -1,7 +1,9 @@
+import { NavLink } from "react-router-dom";
+
 function MainLayout({ children }) {
   return (
     <div className="flex min-h-screen bg-[#0F172A] text-white">
-        
+
 
       {/* ===== Sidebar ===== */}
       <div className="w-64 bg-[#0F172A] p-6 space-y-8 border-r border-white/10">
@@ -15,23 +17,35 @@ function MainLayout({ children }) {
           </p>
         </div>
 
-        <nav className="space-y-4 text-sm">
+        <nav className="space-y-4 text-sm mt-8">
 
-          <a href="#" className="flex items-center gap-3 p-3 rounded-xl bg-cyan-500/20 text-cyan-400">
+          <NavLink
+            to="/dashboard"
+            className={({ isActive }) => `flex items-center gap-3 p-3 rounded-xl transition ${isActive ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10'}`}
+          >
             📊 Dashboard
-          </a>
+          </NavLink>
 
-          <a href="#" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 transition">
+          <NavLink
+            to="/map"
+            className={({ isActive }) => `flex items-center gap-3 p-3 rounded-xl transition ${isActive ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10'}`}
+          >
             📍 Location Map
-          </a>
+          </NavLink>
 
-          <a href="#" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 transition">
+          <NavLink
+            to="/reports"
+            className={({ isActive }) => `flex items-center gap-3 p-3 rounded-xl transition ${isActive ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10'}`}
+          >
             📋 Reports
-          </a>
+          </NavLink>
 
-          <a href="#" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 transition">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) => `flex items-center gap-3 p-3 rounded-xl transition ${isActive ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10'}`}
+          >
             ⚙ Settings
-          </a>
+          </NavLink>
 
         </nav>
 

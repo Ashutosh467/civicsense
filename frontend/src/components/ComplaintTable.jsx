@@ -1,35 +1,44 @@
+import { useNavigate } from "react-router-dom";
+import { MapPin } from "lucide-react";
+
 function ComplaintTable({ complaints }) {
+  const navigate = useNavigate();
 
   const urgencyColor = (urgency) => {
-    if (urgency === "High") return "bg-red-500/20 text-red-400";
-    if (urgency === "Medium") return "bg-yellow-500/20 text-yellow-400";
+    const u = urgency?.toLowerCase();
+    if (u === "high") return "bg-red-500/20 text-red-400";
+    if (u === "medium") return "bg-yellow-500/20 text-yellow-400";
     return "bg-green-500/20 text-green-400";
   };
 
   const statusColor = (status) => {
-    if (status === "Pending") return "bg-orange-500/20 text-orange-400";
-    if (status === "In Progress") return "bg-blue-500/20 text-blue-400";
+    const s = status?.toLowerCase();
+    if (s === "pending") return "bg-orange-500/20 text-orange-400";
+    if (s === "in progress") return "bg-blue-500/20 text-blue-400";
     return "bg-green-500/20 text-green-400";
   };
 
   const emotionColor = (emotion) => {
-    if (emotion === "Angry") return "bg-red-500/20 text-red-400";
-    if (emotion === "Frustrated") return "bg-yellow-500/20 text-yellow-400";
-    if (emotion === "Calm") return "bg-green-500/20 text-green-400";
+    const e = emotion?.toLowerCase();
+    if (e === "angry") return "bg-red-500/20 text-red-400";
+    if (e === "frustrated") return "bg-yellow-500/20 text-yellow-400";
+    if (e === "calm") return "bg-green-500/20 text-green-400";
     return "bg-gray-500/20 text-gray-300";
   };
 
   const sortedComplaints = [...complaints].sort((a, b) => {
-    const priority = { High: 1, Medium: 2, Low: 3 };
-    return priority[a.urgency] - priority[b.urgency];
+    const priority = { high: 1, medium: 2, low: 3 };
+    const pA = priority[a.urgency?.toLowerCase()] || 4;
+    const pB = priority[b.urgency?.toLowerCase()] || 4;
+    return pA - pB;
   });
 
   return (
-    <div className="bg-[#111827] rounded-xl shadow-md overflow-hidden border border-white/10">
+    <div className="bg-[#111827] rounded-xl shadow-md border border-white/10 h-[600px] overflow-y-auto custom-scrollbar relative">
 
       <table className="w-full text-left text-sm text-gray-300">
 
-        <thead className="bg-[#1F2937] text-gray-400 uppercase text-xs">
+        <thead className="bg-[#1F2937] text-gray-400 uppercase text-xs sticky top-0 z-10 shadow-md">
           <tr>
             <th className="p-4">Phone</th>
             <th className="p-4">Location</th>
@@ -47,28 +56,38 @@ function ComplaintTable({ complaints }) {
               key={c.id}
               className={`
                 border-t border-white/5 transition duration-300
-                ${c.urgency === "High" ? "bg-red-900/20" : ""}
-                ${c.urgency === "Medium" ? "bg-yellow-900/20" : ""}
-                ${c.urgency === "Low" ? "bg-green-900/20" : ""}
+                ${c.urgency?.toLowerCase() === "high" ? "bg-red-900/20" : ""}
+                ${c.urgency?.toLowerCase() === "medium" ? "bg-yellow-900/20" : ""}
+                ${c.urgency?.toLowerCase() === "low" ? "bg-green-900/20" : ""}
               `}
             >
               <td className="p-4 font-medium">{c.callerNo}</td>
 
-              <td className="p-4">{c.location}</td>
+              <td
+                className="p-4 cursor-pointer group"
+                onClick={() => navigate('/map', { state: { targetLocation: c.location } })}
+              >
+                <div className="flex items-center gap-2 group-hover:text-cyan-400 transition">
+                  <MapPin className="w-4 h-4 text-gray-500 group-hover:text-cyan-400" />
+                  <span className="group-hover:underline decoration-cyan-400/50 underline-offset-4">
+                    {c.location}
+                  </span>
+                </div>
+              </td>
 
               <td className="p-4">{c.issueType}</td>
 
               {/* URGENCY WITH BLINK DOT */}
               <td className="p-4 flex items-center gap-2">
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${urgencyColor(
+                  className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${urgencyColor(
                     c.urgency
                   )}`}
                 >
-                  {c.urgency}
+                  {c.urgency?.toUpperCase() || "UNKNOWN"}
                 </span>
 
-                {c.urgency === "High" && (
+                {c.urgency?.toLowerCase() === "high" && (
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                 )}
               </td>
@@ -76,7 +95,7 @@ function ComplaintTable({ complaints }) {
               {/* EMOTION BADGE */}
               <td className="p-4">
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${emotionColor(
+                  className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${emotionColor(
                     c.emotion
                   )}`}
                 >
@@ -87,7 +106,7 @@ function ComplaintTable({ complaints }) {
               {/* STATUS BADGE */}
               <td className="p-4">
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(
+                  className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${statusColor(
                     c.status
                   )}`}
                 >

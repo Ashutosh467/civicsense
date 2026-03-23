@@ -1,61 +1,71 @@
 export default function LocationInsights({ complaints }) {
 
-  const areas = [
-    { name: "Sector 12", value: 88 },
-    { name: "Koregaon", value: 65 },
-    { name: "Baner", value: 21 },
-  ];
-   const highUrgency = complaints.filter(
-  c => c.urgency === "High"
-  ).length;
+  const locationCounts = {};
+  complaints.forEach((c) => {
+    if (c.location) {
+      locationCounts[c.location] = (locationCounts[c.location] || 0) + 1;
+    }
+  });
 
+  const areas = Object.entries(locationCounts)
+    .map(([name, count]) => ({
+      name,
+      value: Math.round((count / (complaints.length || 1)) * 100),
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 3); // top 3 locations
+
+  const highUrgency = complaints.filter((c) => c.urgency === "High").length;
   const stressScore = complaints.length
-  ? Math.round((highUrgency / complaints.length) * 100)
-  : 0;
+    ? Math.round((highUrgency / complaints.length) * 100)
+    : 0;
+
   return (
-    <div className="bg-slate-900 text-white rounded-xl p-6 border border-white/10 shadow-lg">
+    <div className="bg-slate-900 text-white rounded-xl p-6 border border-white/10 shadow-lg h-[340px] flex flex-col justify-between">
 
-      <h2 className="mb-6 font-semibold text-lg">📍 Location Insights</h2>
+      <div>
+        <h2 className="mb-4 font-semibold text-lg flex items-center gap-2">📍 Location Insights</h2>
 
-      {/* AREA PROGRESS BARS */}
-      {areas.map((a, i) => (
-        <div key={i} className="mb-5">
+        {/* AREA PROGRESS BARS */}
+        {areas.map((a, i) => (
+          <div key={i} className="mb-5">
 
-          <div className="flex justify-between text-sm mb-2">
-            <span>{a.name}</span>
-            <span>{a.value}%</span>
+            <div className="flex justify-between text-sm mb-2">
+              <span>{a.name}</span>
+              <span>{a.value}%</span>
+            </div>
+
+            <div className="w-full bg-slate-700 h-2 rounded">
+              <div
+                className="h-2 rounded bg-gradient-to-r from-red-500 to-yellow-400"
+                style={{ width: `${stressScore}%` }}
+              />
+            </div>
+
           </div>
+        ))}
 
-          <div className="w-full bg-slate-700 h-2 rounded">
+        {/* ============================= */}
+        {/* Civic Stress Score Section */}
+        {/* ============================= */}
+
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <h3 className="text-sm text-gray-400 mb-3">Civic Stress Score</h3>
+          <div className="w-full bg-gray-700 rounded-full h-3">
             <div
-              className="h-2 rounded bg-gradient-to-r from-red-500 to-yellow-400"
-            style={{ width: `${stressScore}%` }}
-            />
+              className={`h-3 rounded-full ${stressScore > 50 ? "bg-red-500 animate-pulse" : "bg-yellow-500"
+                }`}
+              style={{ width: `${stressScore}%` }}
+            ></div>
           </div>
-
+          <p className="text-xs text-gray-400 mt-2">
+            {stressScore > 50
+              ? "High civic stress detected"
+              : "Normal civic stress levels"}
+          </p>
         </div>
-      ))}
-
-      {/* ============================= */}
-      {/* Civic Stress Score Section */}
-      {/* ============================= */}
-
-      <div className="mt-8">
-
-        <h3 className="text-sm text-gray-400 mb-3">
-          Civic Stress Score
-        </h3>
-
-        <div className="w-full bg-gray-700 rounded-full h-3">
-          <div className="bg-red-500 h-3 rounded-full w-[80%] animate-pulse"></div>
-        </div>
-
-        <p className="text-xs text-gray-400 mt-2">
-          High civic stress detected
-        </p>
 
       </div>
-
     </div>
   );
 }
