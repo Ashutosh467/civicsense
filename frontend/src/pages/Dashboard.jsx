@@ -82,7 +82,8 @@ function Dashboard() {
   const locationCounts = {};
 
   complaints.forEach((c) => {
-    locationCounts[c.location] = (locationCounts[c.location] || 0) + 1;
+    const locKey = c.translatedLocation || c.location || "Unknown";
+    locationCounts[locKey] = (locationCounts[locKey] || 0) + 1;
   });
 
   const patternLocation = Object.keys(locationCounts).find(
@@ -92,7 +93,8 @@ function Dashboard() {
   const uniqueLocations = new Set();
   complaints.forEach((c) => {
     if (c.status?.toLowerCase() !== 'resolved') {
-      uniqueLocations.add(c.location || "Unknown");
+      const locKey = c.translatedLocation || c.location || "Unknown";
+      uniqueLocations.add(locKey);
     }
   });
   const affectedRegionsCount = uniqueLocations.size;

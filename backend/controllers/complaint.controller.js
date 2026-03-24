@@ -1,5 +1,6 @@
 import Complaint from "../models/complaint.model.js";
 import { getIO } from "../sockets/socket.js";
+import { processComplaint } from "../services/aiService.js";
 
 /*
 =============================
@@ -8,14 +9,43 @@ CREATE COMPLAINT
 */
 export const createComplaint = async (req, res) => {
   try {
+    const { callerNo = "Unknown", issueType = "General", location = "Unknown", emotion = "neutral" } = req.body;
+    let urgency = req.body.urgency || "low";
+    
+    // 1. DUPLICATE CHECK
+    const recentSimilar = await Complaint.find({
+      location,
+      issueType,
+      time: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    });
+
+    const isDuplicate = recentSimilar.length >= 2;
+    const clusterSize = recentSimilar.length + 1;
+
+    // 2. CALL AI
+    const aiResult = await processComplaint(issueType, location, callerNo);
+
+    // 3. FINAL URGENCY
+    if (isDuplicate) urgency = "high";
+    if (aiResult.urgencyOverride === "HIGH") urgency = "high";
+
+    // 4. SAVE with all fields
     const newComplaint = await Complaint.create({
-      callerNo: req.body.callerNo || "Unknown",
-      issueType: req.body.issueType || "General",
-      location: req.body.location || "Unknown",
-      urgency: req.body.urgency || "low",
-      emotion: req.body.emotion || "neutral",
-      summary: req.body.summary || "",
+      callerNo,
+      issueType, // Original
+      issue: aiResult.translatedIssue || issueType, // Translated (if not English)
+      location, // Original
+      urgency, // Final
+      emotion,
       status: "pending",
+      summary: aiResult.summary,
+      department: aiResult.department,
+      detectedLanguage: aiResult.detectedLanguage,
+      isEnglish: aiResult.isEnglish,
+      translatedIssue: aiResult.translatedIssue,
+      translatedLocation: aiResult.translatedLocation,
+      isDuplicate,
+      clusterSize
     });
 
     try {

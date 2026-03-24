@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { API } from "../services/api";
 import {
   AlertTriangle,
@@ -8,6 +8,7 @@ import {
   Car,
   AlertCircle,
   X,
+  Layers,
 } from "lucide-react";
 import {
   MapContainer,
@@ -19,6 +20,10 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import MarkerClusterGroup from "react-leaflet-markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import "leaflet.heat";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -64,15 +69,68 @@ const ChangeView = ({ center, zoom }) => {
   return null;
 };
 
+const HeatLayer = ({ points }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (!points || points.length === 0) return;
+    const heat = L.heatLayer(points, {
+      radius: 35,
+      blur: 25,
+      maxZoom: 10,
+      gradient: {
+        0.2: "#639922",
+        0.5: "#EF9F27",
+        0.8: "#E24B4A",
+        1.0: "#7B0000",
+      },
+    }).addTo(map);
+
+    return () => {
+      map.removeLayer(heat);
+    };
+  }, [map, points]);
+  return null;
+};
+
+const createClusterCustomIcon = function (cluster) {
+  const markers = cluster.getAllChildMarkers();
+  let hasHigh = false;
+  let hasMedium = false;
+  let totalCount = 0;
+
+  markers.forEach((marker) => {
+    const urgency = marker.options.urgency || (marker.options.pathOptions && marker.options.pathOptions.urgency) || "LOW";
+    const count = marker.options.count || (marker.options.pathOptions && marker.options.pathOptions.count) || 1;
+    totalCount += count;
+    if (urgency === "HIGH") hasHigh = true;
+    if (urgency === "MEDIUM") hasMedium = true;
+  });
+
+  let color = "#639922"; // default LOW GREEN
+  if (hasHigh) color = "#E24B4A"; // RED
+  else if (hasMedium) color = "#EF9F27"; // ORANGE
+
+  return L.divIcon({
+    html: `<div style="background-color: #1E293B; color: white; border: 2px solid ${color}; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; box-shadow: 0 0 10px ${color}80;"><span>${totalCount}</span></div>`,
+    className: "custom-marker-cluster",
+    iconSize: L.point(36, 36, true),
+  });
+};
+
 export default function MapPage() {
+  const navigate = useNavigate();
   const [complaints, setComplaints] = useState([]);
   const [zones, setZones] = useState([]);
+  const zonesRef = useRef([]);
   const [userLoc, setUserLoc] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [firstLoad, setFirstLoad] = useState(true);
   const [route, setRoute] = useState(null);
   const [locError, setLocError] = useState(null);
   const [filter, setFilter] = useState("All");
   const [routeBounds, setRouteBounds] = useState(null);
+  const [viewMode, setViewMode] = useState("Incidents"); // 'Incidents' or 'Heatmap'
+  const [lastUpdated, setLastUpdated] = useState(0);
 
   const routerState = useLocation().state;
   const targetLocation = routerState?.targetLocation;
@@ -82,13 +140,18 @@ export default function MapPage() {
       try {
         const res = await fetch(`${API}/api/complaint`);
         const data = await res.json();
-        if (Array.isArray(data)) setComplaints(data);
+        if (Array.isArray(data)) {
+          setComplaints(data);
+          setLastUpdated(0);
+        }
       } catch (err) {
         console.error("Map data not reachable", err);
-        setLoading(false);
+        if (firstLoad) setLoading(false);
       }
     };
+
     fetchMapData();
+    const intervalId = setInterval(fetchMapData, 30000);
 
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -97,23 +160,35 @@ export default function MapPage() {
           setLocError("Allow location access to get directions to incidents."),
       );
     }
+
+    return () => clearInterval(intervalId);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setLastUpdated((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timerId);
   }, []);
 
   useEffect(() => {
     if (!complaints.length) {
-      setLoading(false);
+      if (firstLoad) setLoading(false);
       return;
     }
 
     const geocodeAll = async () => {
-      setLoading(true);
+      if (zonesRef.current.length === 0 && firstLoad) setLoading(true);
 
       const grouped = {};
       complaints.forEach((c) => {
         if (c.status?.toLowerCase() === "resolved" || !c.location) return;
-        if (!grouped[c.location]) {
-          grouped[c.location] = {
-            location: c.location,
+        
+        const locKey = c.translatedLocation || c.location; // Use translated if available
+        
+        if (!grouped[locKey]) {
+          grouped[locKey] = {
+            location: locKey,
             count: 0,
             urgency: "LOW",
             issues: [],
@@ -121,32 +196,48 @@ export default function MapPage() {
             lng: null,
           };
         }
-        grouped[c.location].count += 1;
-        if (c.issue) grouped[c.location].issues.push(c.issue);
+        grouped[locKey].count += 1;
+        
+        const issueKey = c.translatedIssue || c.issue || c.issueType;
+        if (issueKey) grouped[locKey].issues.push(issueKey);
+        
         const levels = { HIGH: 3, MEDIUM: 2, LOW: 1 };
         const u = c.urgency?.toUpperCase() || "LOW";
-        if ((levels[u] || 1) > (levels[grouped[c.location].urgency] || 1)) {
-          grouped[c.location].urgency = u;
+        if ((levels[u] || 1) > (levels[grouped[locKey].urgency] || 1)) {
+          grouped[locKey].urgency = u;
         }
       });
 
       const zonesArray = Object.values(grouped);
-      const readyZones = [];
+      let currentZones = [...zonesRef.current];
+      let changed = false;
 
       for (let i = 0; i < zonesArray.length; i++) {
         const zone = zonesArray[i];
+
+        const existingZone = currentZones.find((z) => z.location === zone.location);
+        if (existingZone) {
+          if (existingZone.count !== zone.count || existingZone.urgency !== zone.urgency) {
+            existingZone.count = zone.count;
+            existingZone.urgency = zone.urgency;
+            existingZone.issues = zone.issues;
+            changed = true;
+          }
+          continue;
+        }
 
         if (geocodeCache[zone.location]) {
           if (geocodeCache[zone.location].lat !== null) {
             zone.lat = geocodeCache[zone.location].lat;
             zone.lng = geocodeCache[zone.location].lng;
-            readyZones.push({ ...zone });
+            currentZones.push({ ...zone });
+            changed = true;
           }
           continue;
         }
 
         try {
-          await new Promise((r) => setTimeout(r, 300));
+          await new Promise((r) => setTimeout(r, 100));
           const res = await fetch(
             `http://localhost:10000/api/geocode?location=${encodeURIComponent(zone.location)}`,
           );
@@ -155,7 +246,8 @@ export default function MapPage() {
             geocodeCache[zone.location] = { lat: data.lat, lng: data.lon };
             zone.lat = data.lat;
             zone.lng = data.lon;
-            readyZones.push({ ...zone });
+            currentZones.push({ ...zone });
+            changed = true;
           } else {
             geocodeCache[zone.location] = { lat: null, lng: null };
           }
@@ -165,12 +257,19 @@ export default function MapPage() {
         }
       }
 
-      setZones(readyZones);
-      setLoading(false);
+      if (changed || (firstLoad && currentZones.length > 0)) {
+        zonesRef.current = currentZones;
+        setZones(currentZones);
+      }
+
+      if (firstLoad) {
+        setLoading(false);
+        setFirstLoad(false);
+      }
     };
 
     geocodeAll();
-  }, [complaints]);
+  }, [complaints, firstLoad]);
 
   useEffect(() => {
     if (zones.length > 0 && targetLocation && userLoc && !route) {
@@ -216,10 +315,14 @@ export default function MapPage() {
   const visibleZones =
     filter === "All"
       ? zones
-      : zones.filter((z) => z.urgency.toUpperCase() === filter.toUpperCase());
+      : zones.filter((z) => z.urgency?.toUpperCase() === filter.toUpperCase());
 
   const highCount = zones.filter((z) => z.urgency === "HIGH").length;
   const medCount = zones.filter((z) => z.urgency === "MEDIUM").length;
+  const lowCount = zones.filter((z) => z.urgency === "LOW").length;
+
+  const maxDensity = Math.max(...zones.map((z) => z.count), 1);
+  const heatmapPoints = zones.map((z) => [z.lat, z.lng, z.count / maxDensity]);
 
   return (
     <div className="space-y-4 animate-fade-in-up">
@@ -234,6 +337,20 @@ export default function MapPage() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex gap-2 bg-[#1E293B] border border-white/10 rounded-xl p-1">
+            {["Incidents", "Heatmap"].map((f) => (
+              <button
+                key={f}
+                onClick={() => setViewMode(f)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                  viewMode === f ? "bg-indigo-600 text-white" : "text-gray-400 hover:text-white"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
           <div className="flex gap-2 bg-[#1E293B] border border-white/10 rounded-xl p-1">
             {["All", "High", "Medium", "Low"].map((f) => (
               <button
@@ -268,6 +385,10 @@ export default function MapPage() {
             <div className="bg-[#1E293B] border border-yellow-500/30 rounded-xl px-3 py-1.5 text-sm text-center">
               <div className="text-yellow-400 text-xs">Medium</div>
               <div className="text-white font-bold">{medCount}</div>
+            </div>
+            <div className="bg-[#1E293B] border border-green-500/30 rounded-xl px-3 py-1.5 text-sm text-center">
+              <div className="text-green-400 text-xs">Low</div>
+              <div className="text-white font-bold">{lowCount}</div>
             </div>
           </div>
         </div>
@@ -307,6 +428,10 @@ export default function MapPage() {
         className="bg-[#1E293B] border border-white/5 rounded-2xl relative shadow-2xl overflow-hidden"
         style={{ height: "calc(100vh - 240px)" }}
       >
+        <div className="absolute top-4 right-4 bg-[#0F172A]/80 backdrop-blur-sm border border-white/10 px-3 py-1.5 rounded-lg text-xs text-gray-400 z-[400] shadow-xl">
+          Last updated: {lastUpdated} seconds ago
+        </div>
+
         {loading && (
           <div className="absolute inset-0 z-[1000] bg-[#0F172A]/85 backdrop-blur-sm flex flex-col items-center justify-center text-indigo-400 font-medium gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
@@ -334,82 +459,128 @@ export default function MapPage() {
           {userLoc && !route && <ChangeView center={userLoc} zoom={12} />}
           {routeBounds && <FitBounds bounds={routeBounds} />}
 
-          {visibleZones.map((zone, idx) => (
-            <CircleMarker
-              key={idx}
-              center={[zone.lat, zone.lng]}
-              radius={getRadius(zone.count)}
-              pathOptions={{
-                color: getColor(zone.urgency),
-                fillColor: getColor(zone.urgency),
-                fillOpacity: 0.8,
-                weight: 2,
-              }}
-            >
-              <Popup>
-                <div style={{ minWidth: 180 }}>
-                  <div
-                    style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}
-                  >
-                    {zone.location}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>
-                    {zone.count} active complaint{zone.count > 1 ? "s" : ""}
-                  </div>
-                  <div
-                    style={{
-                      display: "inline-block",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 4,
-                      marginBottom: 8,
-                      background:
-                        zone.urgency === "HIGH"
-                          ? "#FCEBEB"
-                          : zone.urgency === "MEDIUM"
-                            ? "#FAEEDA"
-                            : "#EAF3DE",
-                      color:
-                        zone.urgency === "HIGH"
-                          ? "#A32D2D"
-                          : zone.urgency === "MEDIUM"
-                            ? "#854F0B"
-                            : "#3B6D11",
-                    }}
-                  >
-                    {zone.urgency} URGENCY
-                  </div>
-                  {zone.issues.length > 0 && (
-                    <div
-                      style={{ fontSize: 11, color: "#666", marginBottom: 8 }}
-                    >
-                      {[...new Set(zone.issues)].slice(0, 3).join(", ")}
+          {viewMode === "Heatmap" ? (
+            <HeatLayer points={heatmapPoints} />
+          ) : (
+            <MarkerClusterGroup iconCreateFunction={createClusterCustomIcon}>
+              {visibleZones.map((zone) => (
+                <CircleMarker
+                  key={zone.location}
+                  center={[zone.lat, zone.lng]}
+                  radius={getRadius(zone.count)}
+                  pathOptions={{
+                    color: getColor(zone.urgency),
+                    fillColor: getColor(zone.urgency),
+                    fillOpacity: 0.8,
+                    weight: 2,
+                    urgency: zone.urgency,
+                    count: zone.count,
+                  }}
+                >
+                  <Popup>
+                    <div style={{ minWidth: 180 }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 14,
+                          marginBottom: 4,
+                        }}
+                      >
+                        {zone.location}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "#555",
+                          marginBottom: 6,
+                        }}
+                      >
+                        {zone.count} active complaint{zone.count > 1 ? "s" : ""}
+                      </div>
+                      <div
+                        style={{
+                          display: "inline-block",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          marginBottom: 8,
+                          background:
+                            zone.urgency === "HIGH"
+                              ? "#FCEBEB"
+                              : zone.urgency === "MEDIUM"
+                                ? "#FAEEDA"
+                                : "#EAF3DE",
+                          color:
+                            zone.urgency === "HIGH"
+                              ? "#A32D2D"
+                              : zone.urgency === "MEDIUM"
+                                ? "#854F0B"
+                                : "#3B6D11",
+                        }}
+                      >
+                        {zone.urgency} URGENCY
+                      </div>
+                      {zone.issues.length > 0 && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "#666",
+                            marginBottom: 8,
+                          }}
+                        >
+                          {[...new Set(zone.issues)].slice(0, 3).join(", ")}
+                        </div>
+                      )}
+                      
+                      <button
+                        onClick={() => {
+                          // Dashboard.jsx needs to read location.state.filterLocation
+                          navigate("/dashboard", {
+                            state: { filterLocation: zone.location },
+                          });
+                        }}
+                        style={{
+                          width: "100%",
+                          background: "white",
+                          color: "#333",
+                          border: "1px solid #ccc",
+                          borderRadius: 6,
+                          padding: "7px 0",
+                          fontWeight: 600,
+                          fontSize: 12,
+                          cursor: "pointer",
+                          marginBottom: 8,
+                        }}
+                      >
+                        View in Dashboard
+                      </button>
+
+                      <button
+                        onClick={() => fetchRoute(zone)}
+                        style={{
+                          width: "100%",
+                          background: "#4F46E5",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 6,
+                          padding: "7px 0",
+                          fontWeight: 600,
+                          fontSize: 12,
+                          cursor: userLoc ? "pointer" : "not-allowed",
+                          opacity: userLoc ? 1 : 0.5,
+                        }}
+                      >
+                        {userLoc
+                          ? "🧭 Get Directions"
+                          : "Allow location for directions"}
+                      </button>
                     </div>
-                  )}
-                  <button
-                    onClick={() => fetchRoute(zone)}
-                    style={{
-                      width: "100%",
-                      background: "#4F46E5",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 6,
-                      padding: "7px 0",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      cursor: userLoc ? "pointer" : "not-allowed",
-                      opacity: userLoc ? 1 : 0.5,
-                    }}
-                  >
-                    {userLoc
-                      ? "🧭 Get Directions"
-                      : "Allow location for directions"}
-                  </button>
-                </div>
-              </Popup>
-            </CircleMarker>
-          ))}
+                  </Popup>
+                </CircleMarker>
+              ))}
+            </MarkerClusterGroup>
+          )}
 
           {route && (
             <Polyline

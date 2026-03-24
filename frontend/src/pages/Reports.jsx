@@ -27,8 +27,8 @@ export default function Reports() {
         const headers = ["ID", "Location", "Category", "Urgency", "Status", "Reported At"];
         const rows = complaints.map(c => [
             c.id,
-            c.location,
-            c.issueType,
+            c.translatedLocation || c.location,
+            c.translatedIssue || c.issue || c.issueType,
             c.urgency,
             c.status,
             new Date(c.time).toLocaleString()
@@ -105,8 +105,8 @@ export default function Reports() {
                                 {complaints.slice(0, 10).map((c) => (
                                     <tr key={c.id} className="border-b border-white/5 hover:bg-white/5 transition">
                                         <td className="p-3">{new Date(c.time).toLocaleDateString()}</td>
-                                        <td className="p-3">{c.location}</td>
-                                        <td className="p-3">{c.issueType}</td>
+                                        <td className="p-3">{c.translatedLocation || c.location}</td>
+                                        <td className="p-3">{c.translatedIssue || c.issue || c.issueType}</td>
                                         <td className="p-3">{c.status}</td>
                                     </tr>
                                 ))}

@@ -65,20 +65,34 @@ function ComplaintTable({ complaints }) {
 
               <td
                 className="p-4 cursor-pointer group"
-                onClick={() => navigate('/map', { state: { targetLocation: c.location } })}
+                onClick={() => navigate('/map', { state: { targetLocation: c.translatedLocation || c.location } })}
               >
                 <div className="flex items-center gap-2 group-hover:text-cyan-400 transition">
                   <MapPin className="w-4 h-4 text-gray-500 group-hover:text-cyan-400" />
                   <span className="group-hover:underline decoration-cyan-400/50 underline-offset-4">
-                    {c.location}
+                    {c.translatedLocation || c.location}
                   </span>
                 </div>
               </td>
 
-              <td className="p-4">{c.issueType}</td>
+              <td className="p-4" title={c.summary}>
+                <div className="font-medium text-gray-200">{c.translatedIssue || c.issueType}</div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {!c.isEnglish && c.detectedLanguage && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#EEEDFE] text-[#534AB7]">
+                      {c.detectedLanguage}→EN
+                    </span>
+                  )}
+                  {c.department && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F1EFE8] text-[#5F5E5A]">
+                      {c.department}
+                    </span>
+                  )}
+                </div>
+              </td>
 
               {/* URGENCY WITH BLINK DOT */}
-              <td className="p-4 flex items-center gap-2">
+              <td className="p-4 flex flex-wrap items-center gap-2">
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${urgencyColor(
                     c.urgency
@@ -89,6 +103,11 @@ function ComplaintTable({ complaints }) {
 
                 {c.urgency?.toLowerCase() === "high" && (
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                )}
+                {c.isDuplicate && (
+                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-500 animate-pulse border border-red-500/50">
+                     CLUSTER
+                   </span>
                 )}
               </td>
 

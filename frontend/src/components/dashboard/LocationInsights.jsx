@@ -2,8 +2,9 @@ export default function LocationInsights({ complaints }) {
 
   const locationCounts = {};
   complaints.forEach((c) => {
-    if (c.location) {
-      locationCounts[c.location] = (locationCounts[c.location] || 0) + 1;
+    const locationKey = c.translatedLocation || c.location;
+    if (locationKey) {
+      locationCounts[locationKey] = (locationCounts[locationKey] || 0) + 1;
     }
   });
 

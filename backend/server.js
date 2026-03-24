@@ -1,4 +1,5 @@
-import dotenv from "dotenv";
+import "dotenv/config"; // ✅ MUST BE FIRST (fix for env loading)
+
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -13,11 +14,17 @@ import cors from "cors";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.join(__dirname, ".env") });
+// ❌ REMOVED dotenv.config() (no longer needed)
 
+// ================================
+// DATABASE
+// ================================
 import connectDB from "./config/db.js";
 connectDB();
 
+// ================================
+// ROUTES
+// ================================
 import complaintRoutes from "./routes/complaint.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import authRoutes from "./routes/auth.routes.js";
