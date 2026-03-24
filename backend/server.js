@@ -21,6 +21,7 @@ connectDB();
 import complaintRoutes from "./routes/complaint.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import authRoutes from "./routes/auth.routes.js";
+import geocodeRoutes from "./routes/geocode.js";
 import { setIO } from "./sockets/socket.js";
 
 // ================================
@@ -96,6 +97,7 @@ app.get("/health", (req, res) => {
 app.use("/api/complaint", complaintRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/geocode", geocodeRoutes);
 
 // ================================
 // SOCKET LOGGING
