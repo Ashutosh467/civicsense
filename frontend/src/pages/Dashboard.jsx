@@ -4,6 +4,7 @@ import LocationInsights from "../components/dashboard/LocationInsights";
 import AIConversation from "../components/dashboard/AIConversation";
 import { useEffect, useState } from "react";
 import { socket } from "../services/socket";
+import toast from "react-hot-toast";
 
 import ComplaintTable from "../components/ComplaintTable";
 
@@ -11,6 +12,23 @@ import OverviewCard from "../components/OverviewCard";
 
 function Dashboard() {
   const [complaints, setComplaints] = useState([]);
+  const [officers, setOfficers] = useState([]);
+  const [isOfficersExpanded, setIsOfficersExpanded] = useState(false);
+  const [newOfficer, setNewOfficer] = useState({ name: "", area: "", department: "PWD", phone: "" });
+
+  const fetchOfficers = async () => {
+    try {
+      const res = await fetch(`${API}/api/officer`);
+      const data = await res.json();
+      setOfficers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch officers", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchOfficers();
+  }, []);
 
   useEffect(() => {
     // 🔥 FUNCTION TO FETCH DATA
@@ -44,6 +62,30 @@ function Dashboard() {
     // 🔥 REALTIME UPDATE
     socket.on("newComplaint", (data) => {
       setComplaints((prev) => [data, ...prev]);
+    });
+
+    socket.on("complaintAssigned", (data) => {
+      setComplaints((prev) =>
+        prev.map((c) => {
+          const cid = c.id || c._id;
+          if (cid === data.complaintId) {
+            return { ...c, status: "assigned", assignedTo: data.officerId };
+          }
+          return c;
+        })
+      );
+      fetchOfficers();
+    });
+
+    socket.on("complaintResolved", (data) => {
+      setComplaints((prev) =>
+        prev.map((c) => {
+          const cid = c.id || c._id;
+          const updatedId = data.id || data._id;
+          return cid === updatedId ? { ...c, ...data } : c;
+        })
+      );
+      fetchOfficers();
     });
 
     // 🔥 CLEANUP
@@ -192,6 +234,120 @@ function Dashboard() {
           <AIConversation complaint={complaints[0]} />
         </div>
       </div>
+
+      {/* OFFICER MANAGEMENT SECTION */}
+      <div className="bg-[#111827] rounded-xl shadow-md border border-white/10 overflow-hidden mt-8">
+        <button 
+          onClick={() => setIsOfficersExpanded(!isOfficersExpanded)}
+          className="w-full bg-[#1F2937] p-4 text-left font-bold flex justify-between items-center text-white"
+        >
+          <span>👮 Officer Management</span>
+          <span>{isOfficersExpanded ? "▲ Collapse" : "▼ Expand"}</span>
+        </button>
+        
+        {isOfficersExpanded && (
+          <div className="p-6 space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-white">Add New Officer</h2>
+              <button onClick={fetchOfficers} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded transition text-white">
+                ↻ Refresh List
+              </button>
+            </div>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const res = await fetch(`${API}/api/officer`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(newOfficer)
+                });
+                if (res.ok) {
+                  setNewOfficer({ name: "", area: "", department: "PWD", phone: "" });
+                  fetchOfficers();
+                  toast.success("Officer created!");
+                }
+              } catch (err) { console.error(err); }
+            }} className="flex flex-wrap gap-4 items-end bg-[#1E293B] p-4 rounded-xl border border-white/5">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-400">Name</label>
+                <input required value={newOfficer.name} onChange={e => setNewOfficer({...newOfficer, name: e.target.value})} className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Officer Name" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-400">Area</label>
+                <input required value={newOfficer.area} onChange={e => setNewOfficer({...newOfficer, area: e.target.value})} className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Jurisdiction Area" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-400">Department</label>
+                <select value={newOfficer.department} onChange={e => setNewOfficer({...newOfficer, department: e.target.value})} className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                  <option>PWD</option>
+                  <option>Fire Department</option>
+                  <option>Police</option>
+                  <option>Municipal Corporation</option>
+                  <option>Water Board</option>
+                  <option>Electricity Board</option>
+                  <option>Health Department</option>
+                  <option>Traffic Police</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-400">Phone</label>
+                <input required value={newOfficer.phone} onChange={e => setNewOfficer({...newOfficer, phone: e.target.value})} className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Phone Number" />
+              </div>
+              <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-4 py-2 rounded transition">
+                Create
+              </button>
+            </form>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-300">
+                <thead className="bg-[#0F172A] border-b border-white/10">
+                  <tr>
+                    <th className="p-3">Officer ID</th>
+                    <th className="p-3">Name</th>
+                    <th className="p-3">Department</th>
+                    <th className="p-3">Area</th>
+                    <th className="p-3">Active Complaints</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Portal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {officers.map(o => (
+                    <tr key={o.officerId} className="border-b border-white/5 hover:bg-white/5">
+                      <td className="p-3 font-mono text-xs text-gray-400">{o.officerId}</td>
+                      <td className="p-3 font-medium text-white">{o.name}</td>
+                      <td className="p-3">{o.department}</td>
+                      <td className="p-3">{o.area}</td>
+                      <td className="p-3">
+                        <span className="bg-gray-700 text-white px-2 py-0.5 rounded text-xs">{o.activeComplaintsCount}</span>
+                      </td>
+                      <td className="p-3">
+                        {o.isAvailable ? (
+                          <span className="text-green-400 bg-green-500/10 px-2 py-0.5 rounded text-xs">Available</span>
+                        ) : (
+                          <span className="text-red-400 bg-red-500/10 px-2 py-0.5 rounded text-xs">Offline</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <a href={`/officer/${o.officerId}`} target="_blank" rel="noreferrer" className="text-cyan-400 flex items-center gap-1 hover:underline">
+                          Open ↗
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                  {officers.length === 0 && (
+                    <tr>
+                      <td colSpan="7" className="p-6 text-center text-gray-500">No officers found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

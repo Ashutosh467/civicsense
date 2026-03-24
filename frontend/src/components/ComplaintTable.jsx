@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { MapPin } from "lucide-react";
+import {   MapPin } from "lucide-react";
+import toast from "react-hot-toast";
+import { API } from "../services/api";
 
 function ComplaintTable({ complaints }) {
   const navigate = useNavigate();
@@ -14,8 +16,23 @@ function ComplaintTable({ complaints }) {
   const statusColor = (status) => {
     const s = status?.toLowerCase();
     if (s === "pending") return "bg-orange-500/20 text-orange-400";
-    if (s === "in progress") return "bg-blue-500/20 text-blue-400";
+    if (s === "in progress" || s === "assigned") return "bg-blue-500/20 text-blue-400";
     return "bg-green-500/20 text-green-400";
+  };
+
+  const handleAssign = async (complaintId) => {
+    try {
+      const res = await fetch(`${API}/api/officer/${complaintId}/auto-assign`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Assigned to ${data.officerName}`);
+      } else {
+        toast.error(data.message || "Assignment failed");
+      }
+    } catch (err) {
+      toast.error("Error connecting to server");
+      console.error(err);
+    }
   };
 
   const emotionColor = (emotion) => {
@@ -47,6 +64,7 @@ function ComplaintTable({ complaints }) {
             <th className="p-4">Emotion</th>
             <th className="p-4">Status</th>
             <th className="p-4">Time</th>
+            <th className="p-4">Action</th>
           </tr>
         </thead>
 
@@ -134,6 +152,27 @@ function ComplaintTable({ complaints }) {
               </td>
 
               <td className="p-4 text-gray-400">{c.time}</td>
+              <td className="p-4">
+                {c.status?.toLowerCase() === "pending" && (
+                  <button 
+                    onClick={() => handleAssign(c.id || c._id)}
+                    className="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1.5 rounded transition"
+                  >
+                    Auto Assign
+                  </button>
+                )}
+                {(c.status?.toLowerCase() === "assigned" || c.status?.toLowerCase() === "in_progress") && (
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="bg-gray-700 text-gray-300 text-[10px] px-2 py-0.5 rounded">Assigned</span>
+                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">{c.assignedTo}</span>
+                  </div>
+                )}
+                {c.status?.toLowerCase() === "resolved" && (
+                  <span className="text-green-400 border border-green-500/30 bg-green-500/10 text-xs px-2 py-1 rounded flex items-center gap-1 w-max">
+                    Resolved ✓
+                  </span>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
