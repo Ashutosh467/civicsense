@@ -1,30 +1,28 @@
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
+import 'leaflet/dist/leaflet.css';
 import { API } from "../services/api";
 import { socket } from "../services/socket";
-import StatsBar from "../components/LocationMap/StatsBar";
-import ZoneList from "../components/LocationMap/ZoneList";
-import RightPanel from "../components/LocationMap/RightPanel";
+import StatChips from "../components/LocationMap/StatChips";
+import FilterBar from "../components/LocationMap/FilterBar";
 import LiveMap from "../components/LocationMap/LiveMap";
-import Legend from "../components/LocationMap/Legend";
-import { processComplaintsIntoZones } from "../components/LocationMap/utils";
+
+const geocodeCache = {};
 
 export default function LocationMap() {
     const [complaints, setComplaints] = useState([]);
-    const [selectedZone, setSelectedZone] = useState(null);
-    const [viewMode, setViewMode] = useState("Incidents"); // Incidents, Heatmap, Officers
-    const [zoneFilter, setZoneFilter] = useState("All");
+    const [zones, setZones] = useState([]);
+    const [filter, setFilter] = useState("All");
+    const [isLoading, setIsLoading] = useState(false);
+    const [hasZeroMarkers, setHasZeroMarkers] = useState(false);
 
     useEffect(() => {
-        // Replicating Dashboard's data source exactly
         const fetchData = () => {
             fetch(`${API}/api/complaint`, { cache: "no-store" })
                 .then((res) => res.json())
                 .then((data) => {
-                    if (data && Array.isArray(data)) {
-                        setComplaints(data);
-                    }
+                    if (data && Array.isArray(data)) setComplaints(data);
                 })
-                .catch((err) => console.error("Backend not reachable", err));
+                .catch((err) => console.error(err));
         };
 
         fetchData();
@@ -41,57 +39,128 @@ export default function LocationMap() {
         };
     }, []);
 
-    // Compute aggregated zones dynamically
-    const zones = useMemo(() => processComplaintsIntoZones(complaints), [complaints]);
+    useEffect(() => {
+        let isCancelled = false;
+
+        const processGeocoding = async () => {
+            const grouped = {};
+
+            complaints.forEach((c) => {
+                if (c.status === "Resolved" || !c.location) return;
+
+                if (!grouped[c.location]) {
+                    grouped[c.location] = {
+                        location: c.location,
+                        count: 0,
+                        urgency: "LOW",
+                        issues: [],
+                        lat: null,
+                        lng: null,
+                    };
+                }
+
+                grouped[c.location].count += 1;
+                if (c.issue) grouped[c.location].issues.push(c.issue);
+
+                const levels = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+                const currentUrgency = c.urgency?.toUpperCase() || "LOW";
+                if (levels[currentUrgency] > levels[grouped[c.location].urgency]) {
+                    grouped[c.location].urgency = currentUrgency;
+                }
+            });
+
+            const zonesArray = Object.values(grouped);
+            const readyZones = [];
+
+            setIsLoading(true);
+            setHasZeroMarkers(false);
+
+            for (let i = 0; i < zonesArray.length; i++) {
+                if (isCancelled) break;
+                const zone = zonesArray[i];
+
+                if (geocodeCache[zone.location]) {
+                    if (geocodeCache[zone.location].lat !== null) {
+                        zone.lat = geocodeCache[zone.location].lat;
+                        zone.lng = geocodeCache[zone.location].lng;
+                        readyZones.push(zone);
+                    }
+                } else {
+                    try {
+                        await new Promise((r) => setTimeout(r, 300));
+                        const res = await fetch(`http://localhost:10000/api/geocode?location=${encodeURIComponent(zone.location)}`);
+                        const data = await res.json();
+
+                        if (data && data.lat !== null && data.lon !== null) {
+                            const lat = data.lat;
+                            const lng = data.lon;
+                            geocodeCache[zone.location] = { lat, lng };
+                            zone.lat = lat;
+                            zone.lng = lng;
+                            readyZones.push(zone);
+
+                            setZones((prev) => {
+                                if (prev.find(p => p.location === zone.location)) return prev;
+                                return [...prev, zone];
+                            });
+                        } else {
+                            geocodeCache[zone.location] = { lat: null, lng: null };
+                        }
+                    } catch (error) {
+                        console.error("Geocoding failed for", zone.location);
+                    }
+                }
+            }
+
+            if (!isCancelled) {
+                setIsLoading(false);
+                setZones([...readyZones]);
+                if (readyZones.length === 0 && zonesArray.length > 0) {
+                    setHasZeroMarkers(true);
+                }
+            }
+        };
+
+        if (complaints.length > 0) {
+            processGeocoding();
+        } else {
+            setIsLoading(false);
+        }
+
+        return () => { isCancelled = true; };
+    }, [complaints]);
+
+    const totalLocations = zones.length;
+    const highZones = zones.filter((z) => z.urgency === "HIGH").length;
+    const mediumZones = zones.filter((z) => z.urgency === "MEDIUM").length;
+
+    const visibleZones = filter === "All"
+        ? zones
+        : zones.filter((z) => z.urgency.toUpperCase() === filter.toUpperCase());
 
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden bg-[#0b1120] text-white">
-            {/* Stats bar - Top */}
-            <StatsBar zones={zones} />
+        <div className="flex flex-col bg-[#0b1120] text-white p-6 space-y-4 h-full min-h-screen">
+            <div className="flex justify-between items-center w-full">
+                <h1 className="text-3xl font-bold">Location Map</h1>
+                <StatChips total={totalLocations} high={highZones} medium={mediumZones} />
+            </div>
 
-            <div className="flex flex-1 overflow-hidden relative">
-                {/* Left Panel: Zone List */}
-                <ZoneList
-                    zones={zones}
-                    selectedZone={selectedZone}
-                    onSelectZone={setSelectedZone}
-                    filter={zoneFilter}
-                    setFilter={setZoneFilter}
-                />
+            <FilterBar filter={filter} setFilter={setFilter} />
 
-                {/* Center: Live Map Area */}
-                <div className="flex-1 relative bg-[#0b1120]">
-                    {/* View Mode Toggle */}
-                    <div className="absolute top-4 right-4 z-[400] bg-[#1e293b] rounded-lg p-1 flex shadow-lg border border-slate-700">
-                        {['Incidents', 'Heatmap', 'Officers'].map(mode => (
-                            <button
-                                key={mode}
-                                onClick={() => setViewMode(mode)}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${viewMode === mode ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                                    }`}
-                            >
-                                {mode}
-                            </button>
-                        ))}
+            <div className="w-full relative rounded-xl overflow-hidden border border-slate-700 shadow-2xl" style={{ height: "calc(100vh - 120px)" }}>
+                {isLoading && complaints.length > 0 && (
+                    <div className="absolute inset-0 z-[1000] bg-[#0b1120]/80 backdrop-blur-sm flex items-center justify-center">
+                        <div className="text-cyan-400 font-bold animate-pulse text-xl">Geocoding locations...</div>
                     </div>
-
-                    <LiveMap
-                        zones={zones}
-                        selectedZone={selectedZone}
-                        onZoneSelect={setSelectedZone}
-                        viewMode={viewMode}
-                    />
-
-                    <Legend />
-                </div>
-
-                {/* Right Panel: Detail slide-in */}
-                <div
-                    className={`absolute right-0 top-0 bottom-0 z-[500] transform transition-transform duration-300 ${selectedZone ? 'translate-x-0' : 'translate-x-full'
-                        }`}
-                >
-                    <RightPanel zone={selectedZone} onClose={() => setSelectedZone(null)} />
-                </div>
+                )}
+                {!isLoading && hasZeroMarkers && (
+                    <div className="absolute inset-0 z-[1000] bg-[#0b1120]/80 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                        <div className="text-red-400 font-bold text-xl px-6 py-4 bg-[#111827] border border-red-500 rounded-lg pointer-events-auto">
+                            Could not locate complaints on map. Please check your connection.
+                        </div>
+                    </div>
+                )}
+                <LiveMap zones={visibleZones} />
             </div>
         </div>
     );
