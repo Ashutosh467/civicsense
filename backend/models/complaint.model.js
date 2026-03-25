@@ -16,7 +16,14 @@ const complaintSchema = new mongoose.Schema({
     isEnglish: { type: Boolean, default: true },
     translatedIssue: { type: String, default: "" },
     translatedLocation: { type: String, default: "" },
-    issue: { type: String, default: "" }
+    issue: { type: String, default: "" },
+    // Officer Assignment & Resolution
+    assignedTo: { type: String, default: null },
+    assignedAt: { type: Date, default: null },
+    resolvedAt: { type: Date, default: null },
+    resolutionNote: { type: String, default: "" },
+    resolutionPhoto: { type: String, default: "" },
+    citizenConfirmed: { type: Boolean, default: null }
 });
 
 complaintSchema.virtual('id').get(function () {

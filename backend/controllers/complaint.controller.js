@@ -1,6 +1,7 @@
 import Complaint from "../models/complaint.model.js";
 import { getIO } from "../sockets/socket.js";
 import { processComplaint } from "../services/aiService.js";
+import axios from "axios";
 
 /*
 =============================
@@ -52,6 +53,15 @@ export const createComplaint = async (req, res) => {
       getIO().emit("newComplaint", newComplaint.toJSON());
     } catch (e) {
       console.error("Socket error on emit:", e.message);
+    }
+
+    // After newComplaint is created, call Twilio service
+    if (newComplaint.callerNo && newComplaint.callerNo !== "Unknown") {
+      axios.post(
+        `${process.env.TWILIO_SERVICE_URL}/sms/complaint-received`,
+        { toNumber: newComplaint.callerNo, complaintId: newComplaint._id },
+        { headers: { "x-internal-key": process.env.INTERNAL_SECRET } }
+      ).catch(err => console.error("SMS service error:", err.message));
     }
 
     res.status(201).json({
@@ -114,6 +124,66 @@ export const updateComplaintStatus = async (req, res) => {
     await Complaint.findByIdAndUpdate(req.params.id, { status: req.body.status });
 
     res.json({ message: "Status updated successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/*
+=============================
+GET COMPLAINT BY PHONE
+=============================
+*/
+export const getComplaintByPhone = async (req, res) => {
+  try {
+    const phone = decodeURIComponent(req.params.phone);
+    const complaint = await Complaint.findOne({
+      callerNo: phone,
+      status: "resolved",
+      citizenConfirmed: null
+    }).sort({ resolvedAt: -1 });
+
+    if (!complaint) {
+      return res.status(404).json({ message: "No pending confirmation found" });
+    }
+
+    res.json(complaint);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/*
+=============================
+CONFIRM COMPLAINT
+=============================
+*/
+export const confirmComplaint = async (req, res) => {
+  try {
+    const { citizenConfirmed } = req.body;
+    const complaint = await Complaint.findById(req.params.id);
+
+    if (!complaint) {
+      return res.status(404).json({ message: "Complaint not found" });
+    }
+
+    if (citizenConfirmed === true) {
+      complaint.citizenConfirmed = true;
+      // status stays "resolved"
+      await complaint.save();
+    } else if (citizenConfirmed === false) {
+      complaint.citizenConfirmed = false;
+      complaint.status = "in_progress";
+      await complaint.save();
+      
+      try {
+        getIO().emit("complaintReopened", complaint.toJSON());
+      } catch (e) {
+        console.error("Socket error on emit:", e.message);
+      }
+    }
+
+    res.json({ message: "Confirmed", status: complaint.status });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -29,6 +29,7 @@ import complaintRoutes from "./routes/complaint.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import geocodeRoutes from "./routes/geocode.js";
+import officerRoutes from "./routes/officer.routes.js";
 import { setIO } from "./sockets/socket.js";
 
 // ================================
@@ -105,12 +106,18 @@ app.use("/api/complaint", complaintRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/geocode", geocodeRoutes);
+app.use("/api/officer", officerRoutes);
 
 // ================================
 // SOCKET LOGGING
 // ================================
 io.on("connection", (socket) => {
   console.log("✅ Dashboard Connected:", socket.id);
+
+  socket.on("joinOfficerRoom", (officerId) => {
+    socket.join(officerId);
+    console.log(`Officer ${officerId} joined room`);
+  });
 
   socket.on("disconnect", () => {
     console.log("❌ Dashboard Disconnected:", socket.id);
