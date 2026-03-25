@@ -5,6 +5,14 @@ const bodyParser = require("body-parser");
 const twilio = require("twilio");
 const axios = require("axios");
 
+const {
+  sendComplaintReceivedSMS,
+  sendComplaintResolvedSMS,
+  sendOfficerAssignedSMS
+} = require("./smsService");
+
+const { handleSMSReply } = require("./webhookHandler");
+
 const app = express();
 
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -66,7 +74,7 @@ app.post("/voice", validateTwilioRequest, (req, res) => {
     );
 
     twiml.record({
-      maxLength: 60,
+      maxLength: 120,
       timeout: 5,
       playBeep: true,
       action: "/recording-complete",
@@ -152,6 +160,50 @@ app.post("/ai-response", (req, res) => {
     res.status(500).send("Server Error");
   }
 });
+
+/**
+ * SMS INTERNAL ROUTES
+ */
+app.post("/sms/complaint-received", async (req, res) => {
+  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { toNumber, complaintId } = req.body;
+  if (!toNumber || !complaintId) {
+    return res.status(400).json({ error: "Missing toNumber or complaintId" });
+  }
+  const result = await sendComplaintReceivedSMS(toNumber, complaintId);
+  res.status(result.success ? 200 : 500).json(result);
+});
+
+app.post("/sms/complaint-resolved", async (req, res) => {
+  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { toNumber, complaintId } = req.body;
+  if (!toNumber || !complaintId) {
+    return res.status(400).json({ error: "Missing toNumber or complaintId" });
+  }
+  const result = await sendComplaintResolvedSMS(toNumber, complaintId);
+  res.status(result.success ? 200 : 500).json(result);
+});
+
+app.post("/sms/officer-assigned", async (req, res) => {
+  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { officerPhone, officerName, issueType, location, officerId } = req.body;
+  if (!officerPhone || !officerName || !issueType || !location || !officerId) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+  const result = await sendOfficerAssignedSMS(officerPhone, officerName, issueType, location, officerId);
+  res.status(result.success ? 200 : 500).json(result);
+});
+
+/**
+ * SMS WEBHOOK
+ */
+app.post("/sms/reply", validateTwilioRequest, handleSMSReply);
 
 /**
  * START SERVER

@@ -207,10 +207,11 @@ function Dashboard() {
                 key={type}
                 onClick={() => setFilter(type)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition
-                ${filter === type
+                ${
+                  filter === type
                     ? "bg-cyan-500 text-white"
                     : "bg-slate-700 text-gray-300 hover:bg-slate-600"
-                  }`}
+                }`}
               >
                 {type}
               </button>
@@ -223,63 +224,102 @@ function Dashboard() {
             complaints={
               filter === "All"
                 ? complaints
-                : complaints.filter((c) => c.urgency?.toLowerCase() === filter.toLowerCase())
+                : complaints.filter(
+                    (c) => c.urgency?.toLowerCase() === filter.toLowerCase(),
+                  )
             }
           />
         </div>
 
         {/* RIGHT SIDE */}
         <div className="col-span-4 space-y-6">
-          <LocationInsights complaints={complaints} />
+          <LocationInsights complaints={complaints} officers={officers} />
           <AIConversation complaint={complaints[0]} />
         </div>
       </div>
 
       {/* OFFICER MANAGEMENT SECTION */}
       <div className="bg-[#111827] rounded-xl shadow-md border border-white/10 overflow-hidden mt-8">
-        <button 
+        <button
           onClick={() => setIsOfficersExpanded(!isOfficersExpanded)}
           className="w-full bg-[#1F2937] p-4 text-left font-bold flex justify-between items-center text-white"
         >
           <span>👮 Officer Management</span>
           <span>{isOfficersExpanded ? "▲ Collapse" : "▼ Expand"}</span>
         </button>
-        
+
         {isOfficersExpanded && (
           <div className="p-6 space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-white">Add New Officer</h2>
-              <button onClick={fetchOfficers} className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded transition text-white">
+              <h2 className="text-lg font-semibold text-white">
+                Add New Officer
+              </h2>
+              <button
+                onClick={fetchOfficers}
+                className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded transition text-white"
+              >
                 ↻ Refresh List
               </button>
             </div>
-            
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              try {
-                const res = await fetch(`${API}/api/officer`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(newOfficer)
-                });
-                if (res.ok) {
-                  setNewOfficer({ name: "", area: "", department: "PWD", phone: "" });
-                  fetchOfficers();
-                  toast.success("Officer created!");
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  const res = await fetch(`${API}/api/officer`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(newOfficer),
+                  });
+                  if (res.ok) {
+                    setNewOfficer({
+                      name: "",
+                      area: "",
+                      department: "PWD",
+                      phone: "",
+                    });
+                    fetchOfficers();
+                    toast.success("Officer created!");
+                  }
+                } catch (err) {
+                  console.error(err);
                 }
-              } catch (err) { console.error(err); }
-            }} className="flex flex-wrap gap-4 items-end bg-[#1E293B] p-4 rounded-xl border border-white/5">
+              }}
+              className="flex flex-wrap gap-4 items-end bg-[#1E293B] p-4 rounded-xl border border-white/5"
+            >
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-400">Name</label>
-                <input required value={newOfficer.name} onChange={e => setNewOfficer({...newOfficer, name: e.target.value})} className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Officer Name" />
+                <input
+                  required
+                  value={newOfficer.name}
+                  onChange={(e) =>
+                    setNewOfficer({ ...newOfficer, name: e.target.value })
+                  }
+                  className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  placeholder="Officer Name"
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-400">Area</label>
-                <input required value={newOfficer.area} onChange={e => setNewOfficer({...newOfficer, area: e.target.value})} className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Jurisdiction Area" />
+                <input
+                  required
+                  value={newOfficer.area}
+                  onChange={(e) =>
+                    setNewOfficer({ ...newOfficer, area: e.target.value })
+                  }
+                  className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  placeholder="Jurisdiction Area"
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-400">Department</label>
-                <select value={newOfficer.department} onChange={e => setNewOfficer({...newOfficer, department: e.target.value})} className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                <select
+                  value={newOfficer.department}
+                  onChange={(e) =>
+                    setNewOfficer({ ...newOfficer, department: e.target.value })
+                  }
+                  className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                >
                   <option>PWD</option>
                   <option>Fire Department</option>
                   <option>Police</option>
@@ -292,9 +332,20 @@ function Dashboard() {
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-400">Phone</label>
-                <input required value={newOfficer.phone} onChange={e => setNewOfficer({...newOfficer, phone: e.target.value})} className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Phone Number" />
+                <input
+                  required
+                  value={newOfficer.phone}
+                  onChange={(e) =>
+                    setNewOfficer({ ...newOfficer, phone: e.target.value })
+                  }
+                  className="bg-[#0F172A] border border-white/10 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                  placeholder="Phone Number"
+                />
               </div>
-              <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-4 py-2 rounded transition">
+              <button
+                type="submit"
+                className="bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-4 py-2 rounded transition"
+              >
                 Create
               </button>
             </form>
@@ -313,24 +364,40 @@ function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {officers.map(o => (
-                    <tr key={o.officerId} className="border-b border-white/5 hover:bg-white/5">
-                      <td className="p-3 font-mono text-xs text-gray-400">{o.officerId}</td>
+                  {officers.map((o) => (
+                    <tr
+                      key={o.officerId}
+                      className="border-b border-white/5 hover:bg-white/5"
+                    >
+                      <td className="p-3 font-mono text-xs text-gray-400">
+                        {o.officerId}
+                      </td>
                       <td className="p-3 font-medium text-white">{o.name}</td>
                       <td className="p-3">{o.department}</td>
                       <td className="p-3">{o.area}</td>
                       <td className="p-3">
-                        <span className="bg-gray-700 text-white px-2 py-0.5 rounded text-xs">{o.activeComplaintsCount}</span>
+                        <span className="bg-gray-700 text-white px-2 py-0.5 rounded text-xs">
+                          {o.activeComplaintsCount}
+                        </span>
                       </td>
                       <td className="p-3">
                         {o.isAvailable ? (
-                          <span className="text-green-400 bg-green-500/10 px-2 py-0.5 rounded text-xs">Available</span>
+                          <span className="text-green-400 bg-green-500/10 px-2 py-0.5 rounded text-xs">
+                            Available
+                          </span>
                         ) : (
-                          <span className="text-red-400 bg-red-500/10 px-2 py-0.5 rounded text-xs">Offline</span>
+                          <span className="text-red-400 bg-red-500/10 px-2 py-0.5 rounded text-xs">
+                            Offline
+                          </span>
                         )}
                       </td>
                       <td className="p-3">
-                        <a href={`/officer/${o.officerId}`} target="_blank" rel="noreferrer" className="text-cyan-400 flex items-center gap-1 hover:underline">
+                        <a
+                          href={`/officer/${o.officerId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-cyan-400 flex items-center gap-1 hover:underline"
+                        >
                           Open ↗
                         </a>
                       </td>
@@ -338,7 +405,9 @@ function Dashboard() {
                   ))}
                   {officers.length === 0 && (
                     <tr>
-                      <td colSpan="7" className="p-6 text-center text-gray-500">No officers found</td>
+                      <td colSpan="7" className="p-6 text-center text-gray-500">
+                        No officers found
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -347,7 +416,6 @@ function Dashboard() {
           </div>
         )}
       </div>
-
     </div>
   );
 }

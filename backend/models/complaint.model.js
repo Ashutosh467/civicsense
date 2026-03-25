@@ -23,7 +23,8 @@ const complaintSchema = new mongoose.Schema({
     resolvedAt: { type: Date, default: null },
     resolutionNote: { type: String, default: "" },
     resolutionPhoto: { type: String, default: "" },
-    citizenConfirmed: { type: Boolean, default: null }
+    citizenConfirmed: { type: Boolean, default: null },
+    disputeReason: { type: String, default: "" }
 });
 
 complaintSchema.virtual('id').get(function () {

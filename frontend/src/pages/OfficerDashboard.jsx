@@ -13,6 +13,8 @@ export default function OfficerDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [resolvingId, setResolvingId] = useState(null);
   const [resolutionNote, setResolutionNote] = useState("");
+  const [resolutionPhoto, setResolutionPhoto] = useState("");
+  const [photoPreview, setPhotoPreview] = useState("");
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -21,6 +23,17 @@ export default function OfficerDashboard() {
       setIsLoggedIn(true);
       navigate(`/officer/${officerId.trim()}`, { replace: true });
     }
+  };
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setResolutionPhoto(reader.result);
+      setPhotoPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
 
   useEffect(() => {
@@ -96,12 +109,14 @@ export default function OfficerDashboard() {
       const res = await fetch(`${API}/api/officer/${complaintId}/resolve`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ officerId, resolutionNote, resolutionPhoto: "" })
+        body: JSON.stringify({ officerId, resolutionNote, resolutionPhoto })
       });
       if (res.ok) {
         toast.success("Marked as resolved!");
         setResolvingId(null);
         setResolutionNote("");
+        setResolutionPhoto("");
+        setPhotoPreview("");
         fetchComplaints();
       } else {
         const data = await res.json();
@@ -223,7 +238,30 @@ export default function OfficerDashboard() {
                       value={resolutionNote}
                       onChange={e => setResolutionNote(e.target.value)}
                     ></textarea>
-                    <p className="text-[10px] text-gray-500 mb-3 mx-1">📷 Photo upload coming soon</p>
+                    <label className="text-xs text-gray-400 mb-1 block">📷 Resolution Photo (optional but recommended)</label>
+                    <div className="mb-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        id={`photo-${cid}`}
+                      />
+                      <label
+                        htmlFor={`photo-${cid}`}
+                        className="w-full flex items-center justify-center gap-2 bg-[#1E293B] border border-dashed border-indigo-500/40 hover:border-indigo-500 text-indigo-400 text-sm py-3 rounded-lg cursor-pointer transition"
+                      >
+                        📷 {photoPreview ? "Photo Selected ✅" : "Tap to take photo or upload"}
+                      </label>
+                      {photoPreview && (
+                        <img
+                          src={photoPreview}
+                          alt="Resolution proof"
+                          className="mt-2 w-full rounded-lg border border-white/10 max-h-40 object-cover"
+                        />
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       <button onClick={() => setResolvingId(null)} className="flex-1 bg-gray-700 hover:bg-gray-600 transition text-white py-2 rounded-lg text-sm font-medium">Cancel</button>
                       <button onClick={() => handleResolve(cid)} className="flex-1 bg-green-600 hover:bg-green-500 transition text-white py-2 rounded-lg text-sm font-bold">Submit</button>

@@ -173,7 +173,14 @@ export const confirmComplaint = async (req, res) => {
       await complaint.save();
     } else if (citizenConfirmed === false) {
       complaint.citizenConfirmed = false;
-      complaint.status = "in_progress";
+      // If officer submitted photo proof, mark as disputed instead of reopening
+      if (complaint.resolutionPhoto && complaint.resolutionPhoto.length > 0) {
+        complaint.status = "disputed";
+        complaint.disputeReason = "Citizen rejected resolution but photo proof exists";
+      } else {
+        // No photo proof — reopen legitimately
+        complaint.status = "in_progress";
+      }
       await complaint.save();
       
       try {
