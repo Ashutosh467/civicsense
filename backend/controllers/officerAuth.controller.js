@@ -82,12 +82,16 @@ export const officerLogin = async (req, res) => {
 export const approveOfficer = async (req, res) => {
   try {
     const { officerId } = req.params;
-    const { action } = req.body;
+    const { action, area, department } = req.body;
     const officer = await Officer.findOne({ officerId });
     if (!officer)
       return res.status(404).json({ error: "Officer not found" });
 
     officer.approvalStatus = action === "approve" ? "approved" : "rejected";
+    if (action === "approve") {
+      if (area && area.trim()) officer.area = area.trim();
+      if (department && department.trim()) officer.department = department.trim();
+    }
     await officer.save();
     res.status(200).json({ message: `Officer ${action}d successfully` });
   } catch (error) {

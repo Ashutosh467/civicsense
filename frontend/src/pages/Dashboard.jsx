@@ -16,18 +16,48 @@ function Dashboard() {
   const [isOfficersExpanded, setIsOfficersExpanded] = useState(false);
   const [newOfficer, setNewOfficer] = useState({ name: "", area: "", department: "PWD", phone: "" });
 
+  const [pendingOfficers, setPendingOfficers] = useState([]);
+
   const fetchOfficers = async () => {
     try {
       const res = await fetch(`${API}/api/officer`);
       const data = await res.json();
-      setOfficers(Array.isArray(data) ? data : []);
+      setOfficers(Array.isArray(data) ? data.filter(o => o.approvalStatus === "approved" || !o.approvalStatus) : []);
     } catch (err) {
       console.error("Failed to fetch officers", err);
     }
   };
 
+  const fetchPendingOfficers = async () => {
+    try {
+      const res = await fetch(`${API}/api/officer/auth/pending`);
+      const data = await res.json();
+      setPendingOfficers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch pending officers", err);
+    }
+  };
+
+  const handleOfficerApproval = async (officerId, action, area, department) => {
+    try {
+      const res = await fetch(`${API}/api/officer/${officerId}/approve`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, area, department }),
+      });
+      if (res.ok) {
+        toast.success(`Officer ${action}d successfully`);
+        fetchPendingOfficers();
+        fetchOfficers();
+      }
+    } catch (err) {
+      toast.error("Failed to update officer status");
+    }
+  };
+
   useEffect(() => {
     fetchOfficers();
+    fetchPendingOfficers();
   }, []);
 
   useEffect(() => {
@@ -233,6 +263,86 @@ function Dashboard() {
 
         {/* RIGHT SIDE */}
         <div className="col-span-4 space-y-6">
+          {pendingOfficers.length > 0 && (
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
+                <h3 className="text-orange-400 font-semibold text-sm">
+                  {pendingOfficers.length} Officer{pendingOfficers.length > 1 ? "s" : ""} Awaiting Approval
+                </h3>
+              </div>
+              <div className="space-y-3">
+                {pendingOfficers.map((o) => {
+                  const existingAreas = [...new Set(officers.filter(of => of.area && of.area !== "Unassigned").map(of => of.area))];
+                  return (
+                    <div key={o.officerId} className="bg-slate-900/50 rounded-lg px-3 py-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-white text-sm font-medium">{o.name}</p>
+                          <p className="text-gray-400 text-xs">{o.email}</p>
+                        </div>
+                        <button
+                          onClick={() => handleOfficerApproval(o.officerId, "reject")}
+                          className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1 rounded-lg hover:bg-red-500/30 transition font-medium"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            list={`areas-${o.officerId}`}
+                            placeholder="Assign Area (e.g. Sector 12)"
+                            defaultValue={o.area === "Unassigned" ? "" : o.area}
+                            onChange={(e) => {
+                              setPendingOfficers(prev =>
+                                prev.map(p => p.officerId === o.officerId ? { ...p, _area: e.target.value } : p)
+                              );
+                            }}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-orange-500 placeholder:text-gray-600"
+                          />
+                          <datalist id={`areas-${o.officerId}`}>
+                            {existingAreas.map((area, i) => (
+                              <option key={i} value={area} />
+                            ))}
+                          </datalist>
+                          {existingAreas.length > 0 && (
+                            <p className="text-gray-500 text-[10px] mt-1 pl-1">
+                              {existingAreas.length} existing area{existingAreas.length > 1 ? "s" : ""} available
+                            </p>
+                          )}
+                        </div>
+                        <select
+                          defaultValue={o.department === "Unassigned" ? "" : o.department}
+                          onChange={(e) => {
+                            setPendingOfficers(prev =>
+                              prev.map(p => p.officerId === o.officerId ? { ...p, _department: e.target.value } : p)
+                            );
+                          }}
+                          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-orange-500"
+                        >
+                          <option value="">Select Department</option>
+                          <option value="PWD">PWD</option>
+                          <option value="Municipal Corporation">Municipal Corporation</option>
+                          <option value="Water Department">Water Department</option>
+                          <option value="Electricity Board">Electricity Board</option>
+                          <option value="Police">Police</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={() => handleOfficerApproval(o.officerId, "approve", o._area, o._department)}
+                        className="w-full text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-3 py-1.5 rounded-lg hover:bg-green-500/30 transition font-medium"
+                      >
+                        ✓ Approve & Assign
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <LocationInsights complaints={complaints} officers={officers} />
           <AIConversation complaint={complaints[0]} />
         </div>

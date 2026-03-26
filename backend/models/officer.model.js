@@ -6,7 +6,7 @@ const officerSchema = new mongoose.Schema({
   area: { type: String, default: "" },
   department: { type: String, default: "General" },
   phone: { type: String, default: "" },
-  email: { type: String, default: "", unique: true, sparse: true },
+  email: { type: String, default: "", sparse: true },
   password: { type: String, default: "" },
   approvalStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "approved" },
   isAvailable: { type: Boolean, default: true },

@@ -9,6 +9,7 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import LocationMap from "./pages/LocationMap";
 import OfficerDashboard from "./pages/OfficerDashboard";
+import OfficerLogin from "./pages/OfficerLogin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from "react-hot-toast";
@@ -33,6 +34,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/officer/:officerId?" element={<OfficerDashboard />} />
+            <Route path="/officer-login" element={<OfficerLogin />} />
 
             {/* Protected Dashboard */}
             <Route path="/dashboard" element={

@@ -17,11 +17,14 @@ export default function Landing() {
                         CivicSense
                     </span>
                 </div>
-                <div className="flex gap-4">
-                    <Link to="/login" className="px-5 py-2.5 text-sm font-medium text-gray-300 hover:text-white transition">
-                        Log In
+                <div className="flex gap-3 items-center">
+                    <Link to="/officer-login" className="px-4 py-2 text-sm font-medium text-orange-400 border border-orange-500/30 hover:bg-orange-500/10 rounded-full transition">
+                        Officer Login
                     </Link>
-                    <Link to="/signup" className="px-5 py-2.5 text-sm font-medium bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-full transition shadow-[0_0_15px_rgba(6,182,212,0.3)] shadow-cyan-500/20">
+                    <Link to="/login" className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition">
+                        Admin Login
+                    </Link>
+                    <Link to="/signup" className="px-5 py-2.5 text-sm font-medium bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-full transition shadow-cyan-500/20">
                         Get Started
                     </Link>
                 </div>
