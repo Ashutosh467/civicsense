@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const Groq = require("groq-sdk");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+// Gemini removed — using Groq LLaMA for extraction
 const FormData = require("form-data");
 
 const app = express();
@@ -11,7 +11,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// genAI removed
 
 // ================================
 // HEALTH CHECK
@@ -89,9 +89,8 @@ app.post("/process", async (req, res) => {
     const transcript = transcriptionResponse.data.text;
     console.log("✅ Transcript:", transcript);
 
-    // STEP 3: Extract structured data with Gemini
-    console.log("🤖 Extracting complaint data with Gemini...");
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    // STEP 3: Extract complaint data with Groq LLaMA
+    console.log("🤖 Extracting complaint data with Groq LLaMA...");
 
     const prompt = `
 You are an AI assistant for CivicSense, a civic complaint management system in India.
@@ -128,12 +127,17 @@ CRITICAL RULES:
 - Always respond with ONLY the JSON object, nothing else
 `;
 
-    const geminiResult = await model.generateContent(prompt);
-    const geminiText = geminiResult.response.text();
+    const llmResponse = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1,
+      max_tokens: 1000,
+    });
+    const rawText = llmResponse.choices[0].message.content;
 
     // Clean and parse JSON
-    const cleanJson = geminiText.replace(/```json|```/g, "").trim();
-    const extracted = JSON.parse(cleanJson);
+    const cleanedText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const extracted = JSON.parse(cleanedText);
     console.log("✅ Extracted:", extracted);
 
     // STEP 4: Send to backend to create complaint
@@ -161,7 +165,16 @@ CRITICAL RULES:
     const complaintId = backendResponse.data.id;
     console.log("✅ Complaint created:", complaintId);
 
-    // STEP 5: Callback Twilio service with complaintId
+    // STEP 5: Send SMS to citizen
+    console.log("📱 Sending SMS to citizen...");
+    await axios
+      .post(`${process.env.TWILIO_SERVICE_URL}/sms/complaint-received`, {
+        toNumber: callerNumber,
+        complaintId,
+      })
+      .catch((err) => console.error("❌ SMS to citizen failed:", err.message));
+
+    // STEP 6: Callback Twilio service with complaintId
     console.log("🔔 Sending callback to Twilio service...");
     await axios
       .post(`${process.env.TWILIO_SERVICE_URL}/ai-response`, {
