@@ -37,17 +37,32 @@ app.post("/process", async (req, res) => {
   res.json({ message: "Processing started" });
 
   try {
+    // STEP 1: Wait for Twilio to finish processing the recording
+    console.log("⏳ Waiting 6 seconds for Twilio to finish recording...");
+    await new Promise((resolve) => setTimeout(resolve, 6000));
+
     // STEP 1: Download audio
     console.log("⬇️ Downloading audio...");
-    const audioResponse = await axios.get(recordingUrl, {
-      responseType: "arraybuffer",
-      auth: {
-        username: process.env.TWILIO_ACCOUNT_SID || "placeholder",
-        password: process.env.TWILIO_AUTH_TOKEN || "placeholder",
-      },
-    });
-    const audioBuffer = Buffer.from(audioResponse.data);
-    console.log("✅ Audio downloaded, size:", audioBuffer.length);
+    let audioBuffer;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const audioResponse = await axios.get(recordingUrl, {
+          responseType: "arraybuffer",
+          auth: {
+            username: process.env.TWILIO_ACCOUNT_SID || "placeholder",
+            password: process.env.TWILIO_AUTH_TOKEN || "placeholder",
+          },
+          timeout: 15000,
+        });
+        audioBuffer = Buffer.from(audioResponse.data);
+        console.log(`✅ Audio downloaded on attempt ${attempt}, size:`, audioBuffer.length);
+        break;
+      } catch (dlErr) {
+        console.log(`⚠️ Download attempt ${attempt} failed:`, dlErr.message);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 3000));
+        else throw dlErr;
+      }
+    }
 
     // STEP 2: Transcribe with Groq Whisper
     console.log("🧠 Transcribing with Groq Whisper...");
@@ -58,6 +73,7 @@ app.post("/process", async (req, res) => {
     });
     formData.append("model", "whisper-large-v3");
     formData.append("response_format", "json");
+    formData.append("language", "hi");
 
     const transcriptionResponse = await axios.post(
       "https://api.groq.com/openai/v1/audio/transcriptions",
@@ -75,36 +91,41 @@ app.post("/process", async (req, res) => {
 
     // STEP 3: Extract structured data with Gemini
     console.log("🤖 Extracting complaint data with Gemini...");
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `
 You are an AI assistant for CivicSense, a civic complaint management system in India.
 
-A citizen called and said: "${transcript}"
+A citizen called a government helpline and said the following (may be in Hindi, Punjabi, Tamil, or English):
 
-Extract the following information and respond ONLY with a valid JSON object, no explanation, no markdown:
+TRANSCRIPT: "${transcript}"
+
+Your job is to carefully read the ENTIRE transcript above and extract ALL details the citizen mentioned. Do NOT use default values. Do NOT make up data. Extract ONLY what is actually said in the transcript.
+
+Respond ONLY with a valid JSON object, no explanation, no markdown, no code block:
 
 {
-  "issueType": "short label in English only - like Pothole, Water Supply, Garbage, Street Light, Sewage, Noise, Other",
-  "location": "exact location mentioned or Unknown",
-  "urgency": "low or medium or high",
-  "emotion": "neutral or angry or distressed or calm or frustrated",
-  "summary": "one sentence summary of the complaint in English only",
-  "department": "Municipal Corporation or Water Department or Electricity Board or Public Works Department or Police or Other",
-  "detectedLanguage": "English or Hindi or Punjabi or Tamil or Telugu or Other",
-  "isEnglish": true or false,
-  "translatedIssue": "MUST be in English Roman script only - if Hindi say सड़क पर गड्ढा write Pothole, if Punjabi translate to English",
-  "translatedLocation": "MUST be in English Roman script only - if Hindi say सेक्टर 12 चंडीगढ़ write Sector 12 Chandigarh, never use Devanagari script"
+  "issueType": "The actual civic issue mentioned — e.g. Stray Dogs, Pothole, Water Supply, Garbage Collection, Street Light, Sewage, Noise Pollution, Road Damage, Electricity, Animal Attack — derive this from what the citizen actually said",
+  "location": "The exact place the citizen mentioned — extract area name, sector, phase, colony, city — e.g. Kharar Phase 2, Sector 15 Chandigarh, Anna Nagar Chennai — if truly not mentioned write Unknown",
+  "urgency": "high if: physical attack happened, safety risk to life, medical emergency, no water 24h+, major flooding — medium if: recurring issue, children affected, multiple people affected — low if: minor aesthetic issue",
+  "emotion": "angry if citizen is angry or using strong words — distressed if citizen sounds scared or pleading — frustrated if citizen says this keeps happening — neutral if calm — derive from tone of transcript",
+  "summary": "One clear English sentence summarizing exactly what the citizen reported, including the location and what happened",
+  "department": "Choose the most relevant: Municipal Corporation for roads/garbage/stray animals — Water Department for water supply — Electricity Board for power — Police for crime/safety — Public Works Department for major roads — Other",
+  "detectedLanguage": "Hindi or Punjabi or Tamil or Telugu or English — detect from the transcript",
+  "isEnglish": true if transcript is in English, false otherwise,
+  "translatedIssue": "English translation of the issue type — MUST be Roman script English ONLY — e.g. Stray Dog Attack, Pothole, Water Shortage — NEVER use Devanagari or any non-Latin script",
+  "translatedLocation": "English translation of the location — MUST be Roman script English ONLY — e.g. Kharar Phase 2, Sector 12 Chandigarh — NEVER use Devanagari or any non-Latin script"
 }
 
-Rules:
-- urgency is high if: safety risk, flooding, no water for 24h+, major road damage, medical emergency
-- urgency is medium if: recurring issue, multiple people affected
-- urgency is low if: minor inconvenience, aesthetic issue
-- emotion is angry/distressed if citizen sounds frustrated or urgent
-- translatedIssue and translatedLocation MUST ALWAYS be written in English Roman script, NEVER in Devanagari, Gurmukhi, or any other non-Latin script
-- Even if the citizen spoke in Hindi or Punjabi, translatedIssue and translatedLocation must be their English equivalents
-- Always respond with valid JSON only
+CRITICAL RULES:
+- Read the full transcript carefully before extracting anything
+- issueType MUST reflect what the citizen actually complained about — do NOT default to Water Supply
+- location MUST be extracted from what the citizen said — do NOT default to Near our house
+- If citizen mentions a dog attack, urgency is HIGH and issueType is Stray Dog Attack
+- If citizen mentions children or family affected, urgency is at least MEDIUM
+- translatedIssue and translatedLocation MUST be in English Roman script ONLY — NEVER Devanagari, Gurmukhi, or Tamil script
+- summary must include the actual location and actual issue
+- Always respond with ONLY the JSON object, nothing else
 `;
 
     const geminiResult = await model.generateContent(prompt);
