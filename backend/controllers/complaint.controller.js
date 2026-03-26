@@ -80,7 +80,7 @@ GET ALL COMPLAINTS
 */
 export const getComplaints = async (req, res) => {
   try {
-    const complaints = await Complaint.find({}).sort({ time: -1 });
+    const complaints = await Complaint.find({ isArchived: { $ne: true } }).sort({ time: -1 });
     res.json(complaints);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -148,6 +148,23 @@ export const getComplaintByPhone = async (req, res) => {
     }
 
     res.json(complaint);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/*
+=============================
+SOFT DELETE COMPLAINT
+=============================
+*/
+export const softDeleteComplaint = async (req, res) => {
+  try {
+    const complaint = await Complaint.findById(req.params.id);
+    if (!complaint) return res.status(404).json({ message: "Complaint not found" });
+    complaint.isArchived = true;
+    await complaint.save();
+    res.json({ message: "Complaint archived successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

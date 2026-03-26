@@ -3,7 +3,7 @@ import {   MapPin } from "lucide-react";
 import toast from "react-hot-toast";
 import { API } from "../services/api";
 
-function ComplaintTable({ complaints }) {
+function ComplaintTable({ complaints, officers = [] }) {
   const navigate = useNavigate();
 
   const urgencyColor = (urgency) => {
@@ -163,8 +163,18 @@ function ComplaintTable({ complaints }) {
                 )}
                 {(c.status?.toLowerCase() === "assigned" || c.status?.toLowerCase() === "in_progress") && (
                   <div className="flex flex-col items-start gap-1">
-                    <span className="bg-gray-700 text-gray-300 text-[10px] px-2 py-0.5 rounded">Assigned</span>
-                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">{c.assignedTo}</span>
+                    <span className="bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] px-2 py-0.5 rounded font-medium">
+                      {(() => {
+                        const officer = officers.find(o => o.officerId === c.assignedTo);
+                        return officer ? officer.name : c.assignedTo;
+                      })()}
+                    </span>
+                    <span className="text-[10px] text-gray-500">
+                      {(() => {
+                        const officer = officers.find(o => o.officerId === c.assignedTo);
+                        return officer ? officer.department : "";
+                      })()}
+                    </span>
                   </div>
                 )}
                 {c.status?.toLowerCase() === "resolved" && (

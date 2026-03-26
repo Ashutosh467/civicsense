@@ -26,7 +26,7 @@ export const createOfficer = async (req, res) => {
 // 2. GET returns all officers sorted by activeComplaintsCount ascending
 export const getAllOfficers = async (req, res) => {
   try {
-    const officers = await Officer.find({}).sort({ activeComplaintsCount: 1 });
+    const officers = await Officer.find({ isArchived: { $ne: true } }).sort({ activeComplaintsCount: 1 });
     res.json(officers);
   } catch (error) {
     res.status(500).json({ error: error.message });

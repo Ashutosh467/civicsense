@@ -25,13 +25,39 @@ export default function OfficerDashboard() {
     }
   };
 
-  const handlePhotoUpload = (e) => {
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setResolutionPhoto(reader.result);
-      setPhotoPreview(reader.result);
+    reader.onloadend = async () => {
+      const base64 = reader.result;
+      setPhotoPreview(base64);
+      setIsUploadingPhoto(true);
+
+      try {
+        const res = await fetch(`${API}/api/upload/photo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photo: base64, complaintId: resolvingId }),
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          setResolutionPhoto(data.url);
+          toast.success("Photo uploaded ✅");
+        } else {
+          toast.error("Photo upload failed");
+          setResolutionPhoto(base64);
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+        toast.error("Photo upload failed — using local");
+        setResolutionPhoto(base64);
+      } finally {
+        setIsUploadingPhoto(false);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -252,7 +278,7 @@ export default function OfficerDashboard() {
                         htmlFor={`photo-${cid}`}
                         className="w-full flex items-center justify-center gap-2 bg-[#1E293B] border border-dashed border-indigo-500/40 hover:border-indigo-500 text-indigo-400 text-sm py-3 rounded-lg cursor-pointer transition"
                       >
-                        📷 {photoPreview ? "Photo Selected ✅" : "Tap to take photo or upload"}
+                        📷 {isUploadingPhoto ? "Uploading to cloud..." : photoPreview ? "Photo Uploaded to Cloud ✅" : "Tap to take photo or upload"}
                       </label>
                       {photoPreview && (
                         <img
@@ -264,7 +290,13 @@ export default function OfficerDashboard() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setResolvingId(null)} className="flex-1 bg-gray-700 hover:bg-gray-600 transition text-white py-2 rounded-lg text-sm font-medium">Cancel</button>
-                      <button onClick={() => handleResolve(cid)} className="flex-1 bg-green-600 hover:bg-green-500 transition text-white py-2 rounded-lg text-sm font-bold">Submit</button>
+                      <button
+                        onClick={() => handleResolve(cid)}
+                        disabled={isUploadingPhoto}
+                        className="flex-1 bg-green-600 hover:bg-green-500 transition text-white py-2 rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isUploadingPhoto ? "Uploading..." : "Submit"}
+                      </button>
                     </div>
                   </div>
                 )}

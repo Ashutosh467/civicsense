@@ -30,6 +30,7 @@ import dashboardRoutes from "./routes/dashboard.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import geocodeRoutes from "./routes/geocode.js";
 import officerRoutes from "./routes/officer.routes.js";
+import uploadRoutes from "./routes/upload.routes.js";
 import { setIO } from "./sockets/socket.js";
 
 // ================================
@@ -63,7 +64,8 @@ app.use(
   }),
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ================================
 // SOCKET.IO WITH MATCHING CORS
@@ -107,6 +109,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/geocode", geocodeRoutes);
 app.use("/api/officer", officerRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // ================================
 // SOCKET LOGGING

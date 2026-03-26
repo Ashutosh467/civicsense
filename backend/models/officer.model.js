@@ -10,6 +10,7 @@ const officerSchema = new mongoose.Schema({
   password: { type: String, default: "" },
   approvalStatus: { type: String, enum: ["pending", "approved", "rejected"], default: "approved" },
   isAvailable: { type: Boolean, default: true },
+  isArchived: { type: Boolean, default: false },
   activeComplaintsCount: { type: Number, default: 0 },
   currentLocation: {
     lat: { type: Number, default: null },

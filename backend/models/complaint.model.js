@@ -24,6 +24,7 @@ const complaintSchema = new mongoose.Schema({
     resolutionNote: { type: String, default: "" },
     resolutionPhoto: { type: String, default: "" },
     citizenConfirmed: { type: Boolean, default: null },
+    isArchived: { type: Boolean, default: false },
     disputeReason: { type: String, default: "" }
 });
 
