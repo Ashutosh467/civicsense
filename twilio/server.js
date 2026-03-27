@@ -200,6 +200,16 @@ app.post("/sms/officer-assigned", async (req, res) => {
   res.status(result.success ? 200 : 500).json(result);
 });
 
+app.post("/sms/officer-escalated", async (req, res) => {
+  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { officerPhone, officerName, issueType, location } = req.body;
+  const message = `CivicSense ESCALATION ALERT: Hi ${officerName}, complaint "${issueType}" at ${location} has been escalated to admin due to no action in 72 hours. Please resolve immediately.`;
+  const result = await sendSMS(officerPhone, message);
+  res.json(result);
+});
+
 /**
  * SMS WEBHOOK
  */

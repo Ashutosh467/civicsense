@@ -217,6 +217,11 @@ export default function OfficerDashboard() {
             
             return (
               <div key={cid} className={`bg-[#1E293B] rounded-xl p-4 border transition ${isResolved ? "border-green-500/20 opacity-70" : "border-white/10"}`}>
+                {c.status === "escalated" && (
+                  <div className="bg-red-500/20 border border-red-500 rounded-lg px-3 py-2 text-red-400 text-sm font-semibold mb-3">
+                    ⚠️ This complaint has been escalated to admin due to no action. Resolve immediately.
+                  </div>
+                )}
                 <div className="flex justify-between items-start mb-3">
                   <h3 className="font-bold text-white text-lg leading-tight">{c.translatedIssue || c.issueType}</h3>
                   <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${urgencyColor}`}>

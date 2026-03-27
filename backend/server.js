@@ -1,6 +1,7 @@
 import "dotenv/config"; // ✅ MUST BE FIRST (fix for env loading)
 
 import path from "path";
+import { startEscalationJob } from "./jobs/escalation.job.js";
 import { fileURLToPath } from "url";
 
 import express from "express";
@@ -132,6 +133,7 @@ io.on("connection", (socket) => {
 // ================================
 const PORT = process.env.PORT || 10000;
 
+startEscalationJob();
 server.listen(PORT, () => {
   console.log(`
 🔥 CivicSense Backend Started
