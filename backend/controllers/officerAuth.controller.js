@@ -6,7 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "civicsense_super_secret_key_123";
 
 export const officerSignup = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, phone } = req.body;
     if (!name || !email || !password)
       return res.status(400).json({ error: "Name, email and password are required" });
 

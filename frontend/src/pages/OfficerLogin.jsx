@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 export default function OfficerLogin() {
   const [isSignup, setIsSignup] = useState(false);
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,13 +21,14 @@ export default function OfficerLogin() {
         const res = await fetch(`${API}/api/officer/auth/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, password }),
+          body: JSON.stringify({ name, phone, email, password }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Signup failed");
         toast.success("Signup successful! Await admin approval.");
         setIsSignup(false);
         setName("");
+        setPhone("");
         setEmail("");
         setPassword("");
       } else {
@@ -76,17 +78,30 @@ export default function OfficerLogin() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {isSignup && (
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1.5">Full Name</label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition placeholder:text-gray-600"
-                placeholder="Officer Full Name"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition placeholder:text-gray-600"
+                  placeholder="Officer Full Name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="Mobile Number (10 digits)"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:border-cyan-400"
+                  maxLength={10}
+                />
+              </div>
+            </>
           )}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
@@ -121,7 +136,7 @@ export default function OfficerLogin() {
 
         <div className="mt-6 text-center">
           <button
-            onClick={() => { setIsSignup(!isSignup); setName(""); setEmail(""); setPassword(""); }}
+            onClick={() => { setIsSignup(!isSignup); setName(""); setPhone(""); setEmail(""); setPassword(""); }}
             className="text-orange-400 hover:text-orange-300 text-sm font-medium transition"
           >
             {isSignup ? "Already registered? Login →" : "New officer? Sign up →"}

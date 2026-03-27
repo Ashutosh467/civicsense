@@ -502,7 +502,10 @@ function Dashboard() {
               <tbody>
                 {officers.map((o) => (
                   <tr key={o.officerId} className="border-b border-white/5 hover:bg-white/5">
-                    <td className="p-3 font-medium text-white">{o.name}</td>
+                    <td className="p-3 font-medium text-white">
+                      {o.name}
+                      {o.phone && <span className="text-xs text-gray-400 font-normal ml-2">({o.phone})</span>}
+                    </td>
                     <td className="p-3">{o.department}</td>
                     <td className="p-3">{o.area}</td>
                     <td className="p-3">

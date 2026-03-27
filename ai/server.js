@@ -55,7 +55,10 @@ app.post("/process", async (req, res) => {
           timeout: 15000,
         });
         audioBuffer = Buffer.from(audioResponse.data);
-        console.log(`✅ Audio downloaded on attempt ${attempt}, size:`, audioBuffer.length);
+        console.log(
+          `✅ Audio downloaded on attempt ${attempt}, size:`,
+          audioBuffer.length,
+        );
         break;
       } catch (dlErr) {
         console.log(`⚠️ Download attempt ${attempt} failed:`, dlErr.message);
@@ -136,7 +139,10 @@ CRITICAL RULES:
     const rawText = llmResponse.choices[0].message.content;
 
     // Clean and parse JSON
-    const cleanedText = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const cleanedText = rawText
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
     const extracted = JSON.parse(cleanedText);
     console.log("✅ Extracted:", extracted);
 
@@ -166,13 +172,23 @@ CRITICAL RULES:
     console.log("✅ Complaint created:", complaintId);
 
     // STEP 5: Send SMS to citizen
+    // STEP 5: Send SMS to citizen
+    // STEP 5: Send SMS to citizen
     console.log("📱 Sending SMS to citizen...");
-    await axios
-      .post(`${process.env.TWILIO_SERVICE_URL}/sms/complaint-received`, {
-        toNumber: callerNumber,
-        complaintId,
-      })
-      .catch((err) => console.error("❌ SMS to citizen failed:", err.message));
+    try {
+      const smsRes = await axios.post(
+        `${process.env.TWILIO_SERVICE_URL}/sms/complaint-received`,
+        { toNumber: callerNumber, complaintId },
+        { headers: { "x-internal-key": process.env.INTERNAL_SECRET } },
+      );
+      console.log("✅ Citizen SMS sent:", JSON.stringify(smsRes.data));
+    } catch (smsErr) {
+      console.error(
+        "❌ SMS to citizen failed:",
+        smsErr.response?.status,
+        smsErr.response?.data || smsErr.message,
+      );
+    }
 
     // STEP 6: Callback Twilio service with complaintId
     console.log("🔔 Sending callback to Twilio service...");
