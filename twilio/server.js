@@ -29,9 +29,7 @@ const processedCalls = new Set();
 function validateTwilioRequest(req, res, next) {
   try {
     const signature = req.headers["x-twilio-signature"];
-
-    const url = process.env.PUBLIC_URL + req.originalUrl;
-
+    const url = "https://civicsense-twilio.onrender.com" + req.originalUrl;
     const isValid = twilio.validateRequest(
       process.env.TWILIO_AUTH_TOKEN,
       signature,
