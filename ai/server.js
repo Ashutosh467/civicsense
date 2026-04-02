@@ -96,7 +96,7 @@ app.post("/process", async (req, res) => {
     console.log("🤖 Extracting complaint data with Groq LLaMA...");
 
     const prompt = `
-You are an AI assistant for CivicSense, a civic complaint management system in India.
+You are an AI assistant for CivicCall, a civic complaint management system in India.
 
 A citizen called a government helpline and said the following (may be in Hindi, Punjabi, Tamil, or English):
 

@@ -93,7 +93,7 @@ setIO(io);
 // ROUTES
 // ================================
 app.get("/", (req, res) => {
-  res.send("🚀 CivicSense Backend Running (Production)");
+  res.send("🚀 CivicCall Backend Running (Production)");
 });
 
 app.get("/health", (req, res) => {
@@ -101,7 +101,7 @@ app.get("/health", (req, res) => {
     status: "OK",
     database: "Firebase Firestore",
     realtime: true,
-    service: "CivicSense Backend",
+    service: "CivicCall Backend",
   });
 });
 
@@ -136,7 +136,7 @@ const PORT = process.env.PORT || 10000;
 startEscalationJob();
 server.listen(PORT, () => {
   console.log(`
-🔥 CivicSense Backend Started
+🔥 CivicCall Backend Started
 🌐 Port: ${PORT}
 🔥 Database: MongoDB
 📡 Realtime Enabled

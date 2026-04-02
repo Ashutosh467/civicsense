@@ -26,7 +26,7 @@ async function handleSMSReply(req, res) {
       });
       res.type("text/xml");
       const twiml = new twilio.twiml.MessagingResponse();
-      twiml.message("Thank you for confirming! Your complaint is now\nofficially closed. CivicSense.");
+      twiml.message("Thank you for confirming! Your complaint is now\nofficially closed. CivicCall.");
       return res.send(twiml.toString());
     } else if (reply === "NO") {
       await axios.patch(`${process.env.MAIN_BACKEND_URL}/api/complaint/${complaintId}/confirm`, {
@@ -34,7 +34,7 @@ async function handleSMSReply(req, res) {
       });
       res.type("text/xml");
       const twiml = new twilio.twiml.MessagingResponse();
-      twiml.message("We're sorry the issue wasn't resolved. Your complaint\nhas been reopened and reassigned. CivicSense.");
+      twiml.message("We're sorry the issue wasn't resolved. Your complaint\nhas been reopened and reassigned. CivicCall.");
       return res.send(twiml.toString());
     } else {
       res.type("text/xml");

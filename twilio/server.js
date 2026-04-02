@@ -68,7 +68,7 @@ app.post("/voice", validateTwilioRequest, (req, res) => {
 
     twiml.say(
       { voice: "alice" },
-      "Welcome to Civic Sense. After the beep, please describe your complaint.",
+      "Welcome to CivicCall. After the beep, please describe your complaint.",
     );
 
     twiml.record({
@@ -203,7 +203,7 @@ app.post("/sms/officer-escalated", async (req, res) => {
     return res.status(403).json({ error: "Forbidden" });
   }
   const { officerPhone, officerName, issueType, location } = req.body;
-  const message = `CivicSense ESCALATION ALERT: Hi ${officerName}, complaint "${issueType}" at ${location} has been escalated to admin due to no action in 72 hours. Please resolve immediately.`;
+  const message = `CivicCall ESCALATION ALERT: Hi ${officerName}, complaint "${issueType}" at ${location} has been escalated to admin due to no action in 72 hours. Please resolve immediately.`;
   const result = await sendSMS(officerPhone, message);
   res.json(result);
 });

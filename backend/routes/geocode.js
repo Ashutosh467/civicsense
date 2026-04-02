@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
         // Using native fetch (built-in for Node 18+)
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'CivicSense/1.0 (civic-complaint-system)'
+                'User-Agent': 'CivicCall/1.0 (civic-complaint-system)'
             }
         });
 

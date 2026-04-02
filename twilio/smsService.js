@@ -37,7 +37,7 @@ const getShortId = (id) => String(id).slice(-6).toUpperCase();
 
 const sendComplaintReceivedSMS = async (toNumber, complaintId) => {
   try {
-    const message = `CivicSense: Your complaint has been received. Tracking ID: #CS${getShortId(complaintId)}. We will resolve it within 24 hours. Thank you.`;
+    const message = `CivicCall: Your complaint has been received. Tracking ID: #CS${getShortId(complaintId)}. We will resolve it within 24 hours. Thank you.`;
     const result = await sendSMS(toNumber, message);
     console.log("✅ Received SMS sent to", toNumber, result);
     return { success: true };
@@ -49,7 +49,7 @@ const sendComplaintReceivedSMS = async (toNumber, complaintId) => {
 
 const sendComplaintResolvedSMS = async (toNumber, complaintId) => {
   try {
-    const message = `CivicSense: Your complaint #CS${getShortId(complaintId)} has been resolved by our field officer. Was your issue fixed? Reply YES to confirm or NO to reopen.`;
+    const message = `CivicCall: Your complaint #CS${getShortId(complaintId)} has been resolved by our field officer. Was your issue fixed? Reply YES to confirm or NO to reopen.`;
     const result = await sendSMS(toNumber, message);
     console.log("✅ Resolved SMS sent to", toNumber, result);
     return { success: true };
@@ -62,7 +62,7 @@ const sendComplaintResolvedSMS = async (toNumber, complaintId) => {
 const sendOfficerAssignedSMS = async (officerPhone, officerName, issueType, location, officerId) => {
   try {
     const dashboardLink = `${process.env.MAIN_BACKEND_URL}/officer/${officerId}`;
-    const message = `CivicSense Alert: Hi ${officerName}, new complaint assigned. Issue: ${issueType} at ${location}. Open: ${dashboardLink}`;
+    const message = `CivicCall Alert: Hi ${officerName}, new complaint assigned. Issue: ${issueType} at ${location}. Open: ${dashboardLink}`;
     const result = await sendSMS(officerPhone, message);
     console.log("✅ Officer SMS sent to", officerPhone, result);
     return { success: true };

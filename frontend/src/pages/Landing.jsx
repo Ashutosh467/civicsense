@@ -14,7 +14,7 @@ export default function Landing() {
                 <div className="flex items-center gap-2">
                     <ShieldCheck className="w-8 h-8 text-cyan-400" />
                     <span className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent tracking-tight">
-                        CivicSense
+                        CivicCall
                     </span>
                 </div>
                 <div className="flex gap-3 items-center">
@@ -45,7 +45,7 @@ export default function Landing() {
                 </h1>
 
                 <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-12 leading-relaxed">
-                    Monitor your city in real-time. CivicSense transforms fragmented crisis reports into
+                    Monitor your city in real-time. CivicCall transforms fragmented crisis reports into
                     live structured dashboards using artificial intelligence and geospatial tracking.
                 </p>
 

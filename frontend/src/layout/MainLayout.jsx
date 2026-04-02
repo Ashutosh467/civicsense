@@ -10,7 +10,7 @@ function MainLayout({ children }) {
 
         <div>
           <h1 className="text-2xl font-bold text-cyan-400">
-            CivicSense
+            CivicCall
           </h1>
           <p className="text-xs text-gray-400 tracking-widest">
             OFFICER COMMAND CENTER

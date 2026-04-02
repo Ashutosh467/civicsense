@@ -28,7 +28,7 @@ export default function Login() {
             if (!res.ok) throw new Error(data.error || "Login failed");
 
             login(data.user, data.token);
-            toast.success("Welcome back to CivicSense");
+            toast.success("Welcome back to CivicCall");
             navigate("/dashboard");
         } catch (err) {
             toast.error(err.message);

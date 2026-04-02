@@ -101,7 +101,7 @@ export default function OfficerDashboard() {
       toast("New complaint assigned!", { icon: "🚨", duration: 5000 });
       if (typeof window !== "undefined" && "Notification" in window) {
         if (Notification.permission === "granted") {
-          new Notification("CivicSense", { body: "New complaint assigned!" });
+          new Notification("CivicCall", { body: "New complaint assigned!" });
         } else if (Notification.permission !== "denied") {
           Notification.requestPermission();
         }
@@ -157,7 +157,7 @@ export default function OfficerDashboard() {
     return (
       <div className="min-h-screen bg-[#0b1120] flex items-center justify-center p-4 text-white">
         <div className="bg-[#1E293B] p-8 rounded-2xl w-full max-w-md border border-white/10 shadow-xl">
-          <h1 className="text-2xl font-bold text-white mb-6 text-center">CivicSense<br/><span className="text-cyan-400 text-lg">Field Officer Portal</span></h1>
+          <h1 className="text-2xl font-bold text-white mb-6 text-center">CivicCall<br/><span className="text-cyan-400 text-lg">Field Officer Portal</span></h1>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <input 
               required
@@ -182,7 +182,7 @@ export default function OfficerDashboard() {
   return (
     <div className="min-h-screen bg-[#0b1120] text-gray-300 pb-12">
       <div className="bg-[#1E293B] border-b border-white/5 sticky top-0 z-10 px-4 py-4 flex justify-between items-center shadow-md">
-        <h1 className="font-bold text-white">CivicSense <span className="text-cyan-400">Officer</span></h1>
+        <h1 className="font-bold text-white">CivicCall <span className="text-cyan-400">Officer</span></h1>
         <div className="text-xs bg-[#0F172A] px-2 py-1 rounded text-gray-400 border border-white/5">
           ID: {officerId}
         </div>

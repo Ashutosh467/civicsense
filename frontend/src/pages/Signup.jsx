@@ -50,7 +50,7 @@ export default function Signup() {
                 </div>
 
                 <h2 className="text-3xl font-bold text-white text-center mb-2 tracking-tight">Create Account</h2>
-                <p className="text-gray-400 text-center text-sm mb-8">Join CivicSense to access live dashboards</p>
+                <p className="text-gray-400 text-center text-sm mb-8">Join CivicCall to access live dashboards</p>
 
                 <form onSubmit={handleSignup} className="space-y-4">
                     <div>
