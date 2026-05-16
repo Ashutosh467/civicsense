@@ -211,6 +211,22 @@ app.post("/sms/officer-escalated", async (req, res) => {
 /**
  * SMS WEBHOOK
  */
+
+app.post("/sms/officer-reminder", async (req, res) => {
+  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { officerPhone, officerName, issueType, location, hoursRemaining, reminderType } = req.body;
+  let message;
+  if (reminderType === "30percent") {
+    message = "CivicCall Reminder: Hi " + officerName + ", complaint " + issueType + " at " + location + " needs attention. " + hoursRemaining + " hours remaining.";
+  } else if (reminderType === "60percent") {
+    message = "CivicCall WARNING: Hi " + officerName + ", complaint " + issueType + " at " + location + " is critical. Only " + hoursRemaining + " hours left. Admin notified.";
+  }
+  const result = await sendSMS(officerPhone, message);
+  res.json(result);
+});
+
 app.post("/sms/reply", validateTwilioRequest, handleSMSReply);
 
 /**

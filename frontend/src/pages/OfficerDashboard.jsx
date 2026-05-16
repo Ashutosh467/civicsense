@@ -216,26 +216,91 @@ export default function OfficerDashboard() {
             const cid = c.id || c._id;
             
             return (
-              <div key={cid} className={`bg-[#1E293B] rounded-xl p-4 border transition ${isResolved ? "border-green-500/20 opacity-70" : "border-white/10"}`}>
+              <div
+                key={cid}
+                className={`bg-[#1E293B] rounded-xl p-4 border transition ${isResolved ? "border-green-500/20 opacity-70" : "border-white/10"}`}
+              >
                 {c.status === "escalated" && (
                   <div className="bg-red-500/20 border border-red-500 rounded-lg px-3 py-2 text-red-400 text-sm font-semibold mb-3">
-                    ⚠️ This complaint has been escalated to admin due to no action. Resolve immediately.
+                    ⚠️ This complaint has been escalated to admin due to no
+                    action. Resolve immediately.
                   </div>
                 )}
                 <div className="flex justify-between items-start mb-3">
-                  <h3 className="font-bold text-white text-lg leading-tight">{c.translatedIssue || c.issueType}</h3>
-                  <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${urgencyColor}`}>
-                    {c.urgency}
-                  </span>
+                  <h3 className="font-bold text-white text-lg leading-tight">
+                    {c.translatedIssue || c.issueType}
+                  </h3>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${urgencyColor}`}
+                    >
+                      {c.urgency}
+                    </span>
+                    {c.urgencyScore !== undefined && (
+                      <span className="text-[10px] text-gray-400">
+                        AI:{" "}
+                        <span
+                          className={`font-bold ${
+                            c.urgencyScore >= 8
+                              ? "text-red-400"
+                              : c.urgencyScore >= 6
+                                ? "text-orange-400"
+                                : "text-yellow-400"
+                          }`}
+                        >
+                          {c.urgencyScore?.toFixed(1)}/10
+                        </span>
+                      </span>
+                    )}
+                  </div>
                 </div>
-                
-                <p className="text-sm text-gray-400 mb-4">{new Date(c.time).toLocaleString()}</p>
-                
+
+                <p className="text-sm text-gray-400 mb-2">
+                  {new Date(c.time).toLocaleString()}
+                </p>
+
+                {/* DEADLINE TIMER */}
+                {c.deadline && (
+                  <div
+                    className={`mb-4 px-3 py-2 rounded-lg border ${
+                      new Date(c.deadline) - new Date() < 3600000
+                        ? "bg-red-500/20 border-red-500/50 text-red-400"
+                        : new Date(c.deadline) - new Date() < 21600000
+                          ? "bg-orange-500/20 border-orange-500/50 text-orange-400"
+                          : "bg-blue-500/20 border-blue-500/50 text-blue-400"
+                    }`}
+                  >
+                    <p className="text-xs font-bold">
+                      ⏱ Resolve by: {new Date(c.deadline).toLocaleString()}
+                    </p>
+                    <p className="text-xs mt-0.5">
+                      {(() => {
+                        const diff = new Date(c.deadline) - new Date();
+                        if (diff <= 0)
+                          return "🚨 DEADLINE BREACHED — Resolve immediately!";
+                        const hours = Math.floor(diff / 3600000);
+                        const mins = Math.floor((diff % 3600000) / 60000);
+                        return hours > 0
+                          ? `${hours}h ${mins}m remaining`
+                          : `${mins}m remaining`;
+                      })()}
+                    </p>
+                    {c.audioOverride && (
+                      <p className="text-xs text-red-400 mt-1 animate-pulse">
+                        🎙 Emergency detected via audio
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="bg-[#0F172A] rounded-lg p-3 mb-4 border border-white/5 relative">
-                  <div className="text-sm text-gray-300 pr-10">{c.translatedLocation || c.location}</div>
-                  <a 
+                  <div className="text-sm text-gray-300 pr-10">
+                    {c.translatedLocation || c.location}
+                  </div>
+                  <a
                     href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.translatedLocation || c.location)}`}
-                    target="_blank" rel="noreferrer"
+                    target="_blank"
+                    rel="noreferrer"
                     className="absolute right-3 top-1/2 -translate-y-1/2 bg-indigo-600/20 text-indigo-400 p-2 rounded-lg hover:bg-indigo-600/40 transition flex items-center justify-center"
                   >
                     <Navigation className="w-5 h-5" />
@@ -243,14 +308,18 @@ export default function OfficerDashboard() {
                 </div>
 
                 <div className="flex gap-2 mb-4">
-                  <span className="bg-gray-700/50 text-gray-300 text-[11px] px-2 py-1 rounded border border-white/5">{c.department}</span>
-                  <span className={`text-[11px] px-2 py-1 rounded border font-bold ${isResolved ? "bg-green-500/20 text-green-400 border-green-500/30" : "bg-blue-500/20 text-blue-400 border-blue-500/30"}`}>
+                  <span className="bg-gray-700/50 text-gray-300 text-[11px] px-2 py-1 rounded border border-white/5">
+                    {c.department}
+                  </span>
+                  <span
+                    className={`text-[11px] px-2 py-1 rounded border font-bold ${isResolved ? "bg-green-500/20 text-green-400 border-green-500/30" : "bg-blue-500/20 text-blue-400 border-blue-500/30"}`}
+                  >
                     STATUS: {c.status.replace("_", " ").toUpperCase()}
                   </span>
                 </div>
 
                 {!isResolved && resolvingId !== cid && (
-                  <button 
+                  <button
                     onClick={() => setResolvingId(cid)}
                     className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg flex justify-center items-center gap-2 transition"
                   >
@@ -260,16 +329,20 @@ export default function OfficerDashboard() {
 
                 {resolvingId === cid && (
                   <div className="bg-[#0F172A] p-4 rounded-lg border border-indigo-500/30 mt-2 animate-fade-in-up">
-                    <label className="text-xs text-gray-400 mb-1 block">Resolution Note Validation</label>
-                    <textarea 
+                    <label className="text-xs text-gray-400 mb-1 block">
+                      Resolution Note Validation
+                    </label>
+                    <textarea
                       autoFocus
                       className="w-full bg-[#1E293B] border border-white/10 rounded-lg p-3 text-sm text-white focus:border-green-500 focus:outline-none mb-2"
                       rows="3"
                       placeholder="Describe what action was taken..."
                       value={resolutionNote}
-                      onChange={e => setResolutionNote(e.target.value)}
+                      onChange={(e) => setResolutionNote(e.target.value)}
                     ></textarea>
-                    <label className="text-xs text-gray-400 mb-1 block">📷 Resolution Photo (optional but recommended)</label>
+                    <label className="text-xs text-gray-400 mb-1 block">
+                      📷 Resolution Photo (optional but recommended)
+                    </label>
                     <div className="mb-3">
                       <input
                         type="file"
@@ -283,7 +356,12 @@ export default function OfficerDashboard() {
                         htmlFor={`photo-${cid}`}
                         className="w-full flex items-center justify-center gap-2 bg-[#1E293B] border border-dashed border-indigo-500/40 hover:border-indigo-500 text-indigo-400 text-sm py-3 rounded-lg cursor-pointer transition"
                       >
-                        📷 {isUploadingPhoto ? "Uploading to cloud..." : photoPreview ? "Photo Uploaded to Cloud ✅" : "Tap to take photo or upload"}
+                        📷{" "}
+                        {isUploadingPhoto
+                          ? "Uploading to cloud..."
+                          : photoPreview
+                            ? "Photo Uploaded to Cloud ✅"
+                            : "Tap to take photo or upload"}
                       </label>
                       {photoPreview && (
                         <img
@@ -294,7 +372,12 @@ export default function OfficerDashboard() {
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => setResolvingId(null)} className="flex-1 bg-gray-700 hover:bg-gray-600 transition text-white py-2 rounded-lg text-sm font-medium">Cancel</button>
+                      <button
+                        onClick={() => setResolvingId(null)}
+                        className="flex-1 bg-gray-700 hover:bg-gray-600 transition text-white py-2 rounded-lg text-sm font-medium"
+                      >
+                        Cancel
+                      </button>
                       <button
                         onClick={() => handleResolve(cid)}
                         disabled={isUploadingPhoto}

@@ -31,6 +31,7 @@ import dashboardRoutes from "./routes/dashboard.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import geocodeRoutes from "./routes/geocode.js";
 import officerRoutes from "./routes/officer.routes.js";
+import callerTrustRoutes from "./routes/callerTrust.routes.js";
 import uploadRoutes from "./routes/upload.routes.js";
 import { setIO } from "./sockets/socket.js";
 
@@ -110,6 +111,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/geocode", geocodeRoutes);
 app.use("/api/officer", officerRoutes);
+app.use("/api/caller-trust", callerTrustRoutes);
 app.use("/api/upload", uploadRoutes);
 
 // ================================

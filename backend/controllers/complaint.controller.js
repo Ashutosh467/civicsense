@@ -2,6 +2,7 @@ import Complaint from "../models/complaint.model.js";
 import { getIO } from "../sockets/socket.js";
 import { processComplaint } from "../services/aiService.js";
 import axios from "axios";
+import { assignComplaintToOfficer } from "../services/assignService.js";
 
 /*
 =============================
@@ -10,14 +11,19 @@ CREATE COMPLAINT
 */
 export const createComplaint = async (req, res) => {
   try {
-    const { callerNo = "Unknown", issueType = "General", location = "Unknown", emotion = "neutral" } = req.body;
+    const {
+      callerNo = "Unknown",
+      issueType = "General",
+      location = "Unknown",
+      emotion = "neutral",
+    } = req.body;
     let urgency = req.body.urgency || "low";
-    
+
     // 1. DUPLICATE CHECK
     const recentSimilar = await Complaint.find({
       location,
       issueType,
-      time: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      time: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
     });
 
     const isDuplicate = recentSimilar.length >= 2;
@@ -31,12 +37,19 @@ export const createComplaint = async (req, res) => {
     if (aiResult.urgencyOverride === "HIGH") urgency = "high";
 
     // 4. SAVE with all fields
+    // Calculate deadline
+    const urgencyScore = req.body.urgencyScore || 5;
+    const deadlineHours = req.body.deadlineHours || 72;
+    const deadline = req.body.deadline
+      ? new Date(req.body.deadline)
+      : new Date(Date.now() + deadlineHours * 60 * 60 * 1000);
+
     const newComplaint = await Complaint.create({
       callerNo,
-      issueType, // Original
-      issue: aiResult.translatedIssue || issueType, // Translated (if not English)
-      location, // Original
-      urgency, // Final
+      issueType,
+      issue: aiResult.translatedIssue || issueType,
+      location,
+      urgency,
       emotion,
       status: "pending",
       summary: aiResult.summary,
@@ -46,7 +59,15 @@ export const createComplaint = async (req, res) => {
       translatedIssue: aiResult.translatedIssue,
       translatedLocation: aiResult.translatedLocation,
       isDuplicate,
-      clusterSize
+      clusterSize,
+      // ✅ NEW — AI scoring fields
+      urgencyScore,
+      deadlineHours,
+      deadline,
+      deadlineStatus: "active",
+      audioEmotionScore: req.body.audioEmotionScore || 0,
+      audioOverride: req.body.audioOverride || false,
+      trustScoreAtTime: req.body.trustScoreAtTime || 50,
     });
 
     try {
@@ -57,12 +78,22 @@ export const createComplaint = async (req, res) => {
 
     // After newComplaint is created, call Twilio service
     if (newComplaint.callerNo && newComplaint.callerNo !== "Unknown") {
-      axios.post(
-        `${process.env.TWILIO_SERVICE_URL}/sms/complaint-received`,
-        { toNumber: newComplaint.callerNo, complaintId: newComplaint._id },
-        { headers: { "x-internal-key": process.env.INTERNAL_SECRET } }
-      ).catch(err => console.error("SMS service error:", err.message));
+      axios
+        .post(
+          `${process.env.TWILIO_SERVICE_URL}/sms/complaint-received`,
+          { toNumber: newComplaint.callerNo, complaintId: newComplaint._id },
+          { headers: { "x-internal-key": process.env.INTERNAL_SECRET } },
+        )
+        .catch((err) => console.error("SMS service error:", err.message));
     }
+
+    // Auto assign complaint to best officer
+    setTimeout(async () => {
+      const assignResult = await assignComplaintToOfficer(newComplaint._id);
+      if (!assignResult.success) {
+        console.log("⚠️ Auto assign pending — no officer available yet for:", newComplaint._id);
+      }
+    }, 1000);
 
     res.status(201).json({
       message: "Complaint created successfully",
