@@ -15,6 +15,7 @@ export default function OfficerDashboard() {
   const [resolutionNote, setResolutionNote] = useState("");
   const [resolutionPhoto, setResolutionPhoto] = useState("");
   const [photoPreview, setPhotoPreview] = useState("");
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -24,8 +25,6 @@ export default function OfficerDashboard() {
       navigate(`/officer/${officerId.trim()}`, { replace: true });
     }
   };
-
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -70,9 +69,8 @@ export default function OfficerDashboard() {
     } else if (localStorage.getItem("officerId")) {
       setOfficerId(localStorage.getItem("officerId"));
       setIsLoggedIn(true);
-      // Optional: navigate to the URL with the ID
       if (!paramId && localStorage.getItem("officerId")) {
-          navigate(`/officer/${localStorage.getItem("officerId")}`, { replace: true });
+        navigate(`/officer/${localStorage.getItem("officerId")}`, { replace: true });
       }
     }
   }, [paramId, navigate]);
@@ -90,8 +88,35 @@ export default function OfficerDashboard() {
 
   useEffect(() => {
     if (!isLoggedIn || !officerId) return;
-    
+
     fetchComplaints();
+
+    // ✅ AUTO GPS — starts silently on login, no button needed
+    const sendLocation = () => {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          try {
+            await fetch(`${API}/api/officer/${officerId}/location`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lat: latitude, lng: longitude }),
+            });
+            console.log("📍 Location updated:", latitude, longitude);
+          } catch (err) {
+            console.error("Location update failed:", err);
+          }
+        },
+        (err) => console.error("GPS error:", err),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    };
+
+    // Send immediately on login
+    sendLocation();
+    // Then every 5 minutes silently
+    const gpsInterval = setInterval(sendLocation, 5 * 60 * 1000);
 
     socket.connect();
     socket.emit("joinOfficerRoom", officerId);
@@ -123,6 +148,7 @@ export default function OfficerDashboard() {
     return () => {
       socket.off("newAssignment", handleNewAssignment);
       socket.off("complaintResolved");
+      clearInterval(gpsInterval);
     };
   }, [isLoggedIn, officerId]); // eslint-disable-line
 
@@ -157,13 +183,16 @@ export default function OfficerDashboard() {
     return (
       <div className="min-h-screen bg-[#0b1120] flex items-center justify-center p-4 text-white">
         <div className="bg-[#1E293B] p-8 rounded-2xl w-full max-w-md border border-white/10 shadow-xl">
-          <h1 className="text-2xl font-bold text-white mb-6 text-center">CivicCall<br/><span className="text-cyan-400 text-lg">Field Officer Portal</span></h1>
+          <h1 className="text-2xl font-bold text-white mb-6 text-center">
+            CivicCall<br />
+            <span className="text-cyan-400 text-lg">Field Officer Portal</span>
+          </h1>
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <input 
+            <input
               required
-              value={officerId} 
+              value={officerId}
               onChange={e => setOfficerId(e.target.value)}
-              placeholder="Enter Officer ID" 
+              placeholder="Enter Officer ID"
               className="bg-[#0F172A] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-cyan-500"
             />
             <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl transition">
@@ -177,7 +206,9 @@ export default function OfficerDashboard() {
 
   const activeCount = complaints.filter(c => c.status !== "resolved").length;
   const today = new Date().toDateString();
-  const resolvedToday = complaints.filter(c => c.status === "resolved" && new Date(c.resolvedAt || c.time).toDateString() === today).length;
+  const resolvedToday = complaints.filter(c =>
+    c.status === "resolved" && new Date(c.resolvedAt || c.time).toDateString() === today
+  ).length;
 
   return (
     <div className="min-h-screen bg-[#0b1120] text-gray-300 pb-12">
@@ -201,98 +232,96 @@ export default function OfficerDashboard() {
           </div>
           <div className="bg-[#1E293B] p-3 rounded-xl border border-white/5 text-center">
             <div className="text-2xl font-bold text-cyan-400">{complaints.length}</div>
-            <div className="text-[10px] text-gray-400 uppercase">Total Auto-Assigned</div>
+            <div className="text-[10px] text-gray-400 uppercase">Total Assigned</div>
           </div>
         </div>
 
         {/* COMPLAINTS LIST */}
         <div className="space-y-4">
           {complaints.length === 0 && (
-            <div className="text-center text-gray-500 mt-10">No complaints assigned to you yet.</div>
+            <div className="text-center text-gray-500 mt-10">
+              No complaints assigned to you yet.
+            </div>
           )}
           {complaints.map(c => {
-            const urgencyColor = c.urgency?.toLowerCase() === "high" ? "bg-red-500/20 text-red-400 border border-red-500/30" : c.urgency?.toLowerCase() === "medium" ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30" : "bg-green-500/20 text-green-400 border border-green-500/30";
+            const urgencyColor =
+              c.urgency?.toLowerCase() === "high"
+                ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                : c.urgency?.toLowerCase() === "medium"
+                ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                : "bg-green-500/20 text-green-400 border border-green-500/30";
+
             const isResolved = c.status === "resolved";
             const cid = c.id || c._id;
-            
+
             return (
               <div
                 key={cid}
-                className={`bg-[#1E293B] rounded-xl p-4 border transition ${isResolved ? "border-green-500/20 opacity-70" : "border-white/10"}`}
+                className={`bg-[#1E293B] rounded-xl p-4 border transition ${
+                  isResolved ? "border-green-500/20 opacity-70" : "border-white/10"
+                }`}
               >
+                {/* ESCALATED WARNING */}
                 {c.status === "escalated" && (
                   <div className="bg-red-500/20 border border-red-500 rounded-lg px-3 py-2 text-red-400 text-sm font-semibold mb-3">
-                    ⚠️ This complaint has been escalated to admin due to no
-                    action. Resolve immediately.
+                    ⚠️ This complaint has been escalated. Resolve immediately.
                   </div>
                 )}
+
+                {/* HEADER */}
                 <div className="flex justify-between items-start mb-3">
                   <h3 className="font-bold text-white text-lg leading-tight">
                     {c.translatedIssue || c.issueType}
                   </h3>
                   <div className="flex flex-col items-end gap-1">
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${urgencyColor}`}
-                    >
+                    <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${urgencyColor}`}>
                       {c.urgency}
                     </span>
                     {c.urgencyScore !== undefined && (
                       <span className="text-[10px] text-gray-400">
-                        AI:{" "}
-                        <span
-                          className={`font-bold ${
-                            c.urgencyScore >= 8
-                              ? "text-red-400"
-                              : c.urgencyScore >= 6
-                                ? "text-orange-400"
-                                : "text-yellow-400"
-                          }`}
-                        >
-                          {c.urgencyScore?.toFixed(1)}/10
-                        </span>
+                        AI: <span className={`font-bold ${
+                          c.urgencyScore >= 8 ? "text-red-400" :
+                          c.urgencyScore >= 6 ? "text-orange-400" :
+                          "text-yellow-400"
+                        }`}>{c.urgencyScore?.toFixed(1)}/10</span>
                       </span>
+                    )}
+                    {c.audioOverride && (
+                      <span className="text-[10px] text-red-400 animate-pulse">🎙 Emergency</span>
                     )}
                   </div>
                 </div>
 
+                {/* TIME */}
                 <p className="text-sm text-gray-400 mb-2">
                   {new Date(c.time).toLocaleString()}
                 </p>
 
                 {/* DEADLINE TIMER */}
                 {c.deadline && (
-                  <div
-                    className={`mb-4 px-3 py-2 rounded-lg border ${
-                      new Date(c.deadline) - new Date() < 3600000
-                        ? "bg-red-500/20 border-red-500/50 text-red-400"
-                        : new Date(c.deadline) - new Date() < 21600000
-                          ? "bg-orange-500/20 border-orange-500/50 text-orange-400"
-                          : "bg-blue-500/20 border-blue-500/50 text-blue-400"
-                    }`}
-                  >
+                  <div className={`mb-4 px-3 py-2 rounded-lg border ${
+                    new Date(c.deadline) - new Date() < 3600000
+                      ? "bg-red-500/20 border-red-500/50 text-red-400"
+                      : new Date(c.deadline) - new Date() < 21600000
+                      ? "bg-orange-500/20 border-orange-500/50 text-orange-400"
+                      : "bg-blue-500/20 border-blue-500/50 text-blue-400"
+                  }`}>
                     <p className="text-xs font-bold">
                       ⏱ Resolve by: {new Date(c.deadline).toLocaleString()}
                     </p>
                     <p className="text-xs mt-0.5">
                       {(() => {
                         const diff = new Date(c.deadline) - new Date();
-                        if (diff <= 0)
-                          return "🚨 DEADLINE BREACHED — Resolve immediately!";
+                        if (diff <= 0) return "🚨 DEADLINE BREACHED — Resolve immediately!";
                         const hours = Math.floor(diff / 3600000);
                         const mins = Math.floor((diff % 3600000) / 60000);
-                        return hours > 0
-                          ? `${hours}h ${mins}m remaining`
-                          : `${mins}m remaining`;
+                        return hours > 0 ? `${hours}h ${mins}m remaining` : `${mins}m remaining`;
                       })()}
                     </p>
-                    {c.audioOverride && (
-                      <p className="text-xs text-red-400 mt-1 animate-pulse">
-                        🎙 Emergency detected via audio
-                      </p>
-                    )}
                   </div>
                 )}
 
+                {/* LOCATION */}
                 <div className="bg-[#0F172A] rounded-lg p-3 mb-4 border border-white/5 relative">
                   <div className="text-sm text-gray-300 pr-10">
                     {c.translatedLocation || c.location}
@@ -301,23 +330,27 @@ export default function OfficerDashboard() {
                     href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(c.translatedLocation || c.location)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-indigo-600/20 text-indigo-400 p-2 rounded-lg hover:bg-indigo-600/40 transition flex items-center justify-center"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-indigo-600/20 text-indigo-400 p-2 rounded-lg hover:bg-indigo-600/40 transition"
                   >
                     <Navigation className="w-5 h-5" />
                   </a>
                 </div>
 
-                <div className="flex gap-2 mb-4">
+                {/* BADGES */}
+                <div className="flex gap-2 mb-4 flex-wrap">
                   <span className="bg-gray-700/50 text-gray-300 text-[11px] px-2 py-1 rounded border border-white/5">
                     {c.department}
                   </span>
-                  <span
-                    className={`text-[11px] px-2 py-1 rounded border font-bold ${isResolved ? "bg-green-500/20 text-green-400 border-green-500/30" : "bg-blue-500/20 text-blue-400 border-blue-500/30"}`}
-                  >
-                    STATUS: {c.status.replace("_", " ").toUpperCase()}
+                  <span className={`text-[11px] px-2 py-1 rounded border font-bold ${
+                    isResolved
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                  }`}>
+                    STATUS: {c.status?.replace("_", " ").toUpperCase()}
                   </span>
                 </div>
 
+                {/* RESOLVE BUTTON */}
                 {!isResolved && resolvingId !== cid && (
                   <button
                     onClick={() => setResolvingId(cid)}
@@ -327,21 +360,20 @@ export default function OfficerDashboard() {
                   </button>
                 )}
 
+                {/* RESOLVE FORM */}
                 {resolvingId === cid && (
-                  <div className="bg-[#0F172A] p-4 rounded-lg border border-indigo-500/30 mt-2 animate-fade-in-up">
-                    <label className="text-xs text-gray-400 mb-1 block">
-                      Resolution Note Validation
-                    </label>
+                  <div className="bg-[#0F172A] p-4 rounded-lg border border-indigo-500/30 mt-2">
+                    <label className="text-xs text-gray-400 mb-1 block">Resolution Note</label>
                     <textarea
                       autoFocus
                       className="w-full bg-[#1E293B] border border-white/10 rounded-lg p-3 text-sm text-white focus:border-green-500 focus:outline-none mb-2"
                       rows="3"
                       placeholder="Describe what action was taken..."
                       value={resolutionNote}
-                      onChange={(e) => setResolutionNote(e.target.value)}
-                    ></textarea>
+                      onChange={e => setResolutionNote(e.target.value)}
+                    />
                     <label className="text-xs text-gray-400 mb-1 block">
-                      📷 Resolution Photo (optional but recommended)
+                      📷 Resolution Photo (recommended)
                     </label>
                     <div className="mb-3">
                       <input
@@ -356,12 +388,11 @@ export default function OfficerDashboard() {
                         htmlFor={`photo-${cid}`}
                         className="w-full flex items-center justify-center gap-2 bg-[#1E293B] border border-dashed border-indigo-500/40 hover:border-indigo-500 text-indigo-400 text-sm py-3 rounded-lg cursor-pointer transition"
                       >
-                        📷{" "}
-                        {isUploadingPhoto
-                          ? "Uploading to cloud..."
+                        📷 {isUploadingPhoto
+                          ? "Uploading..."
                           : photoPreview
-                            ? "Photo Uploaded to Cloud ✅"
-                            : "Tap to take photo or upload"}
+                          ? "Photo Uploaded ✅"
+                          : "Tap to take photo or upload"}
                       </label>
                       {photoPreview && (
                         <img
@@ -381,7 +412,7 @@ export default function OfficerDashboard() {
                       <button
                         onClick={() => handleResolve(cid)}
                         disabled={isUploadingPhoto}
-                        className="flex-1 bg-green-600 hover:bg-green-500 transition text-white py-2 rounded-lg text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 bg-green-600 hover:bg-green-500 transition text-white py-2 rounded-lg text-sm font-bold disabled:opacity-50"
                       >
                         {isUploadingPhoto ? "Uploading..." : "Submit"}
                       </button>
