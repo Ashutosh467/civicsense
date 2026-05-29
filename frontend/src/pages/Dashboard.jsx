@@ -246,9 +246,14 @@ function Dashboard() {
                     >
                       <option value="">Select Department</option>
                       <option value="PWD">PWD</option>
-                      <option value="Municipal Corporation">Municipal Corporation</option>
-                      <option value="Water Department">Water Department</option>
-                      <option value="Electricity Board">Electricity Board</option>
+                      <option value="Roads &amp; Infrastructure">Roads &amp; Infrastructure</option>
+                      <option value="Water &amp; Sanitation">Water &amp; Sanitation</option>
+                      <option value="Electricity">Electricity</option>
+                      <option value="Health">Health</option>
+                      <option value="Law &amp; Order">Law &amp; Order</option>
+                      <option value="Municipal Services">Municipal Services</option>
+                      
+                      
                       <option value="Police">Police</option>
                       <option value="Other">Other</option>
                     </select>
@@ -500,9 +505,14 @@ function Dashboard() {
                 <option>PWD</option>
                 <option>Fire Department</option>
                 <option>Police</option>
-                <option>Municipal Corporation</option>
+                <option>Roads & Infrastructure</option>
+                <option>Water & Sanitation</option>
+                <option>Electricity</option>
+                <option>Health</option>
+                <option>Law & Order</option>
+                <option>Municipal Services</option>
                 <option>Water Board</option>
-                <option>Electricity Board</option>
+                <option>Electricity</option>
                 <option>Health Department</option>
                 <option>Traffic Police</option>
               </select>

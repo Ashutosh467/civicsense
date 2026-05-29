@@ -16,7 +16,7 @@ Return ONLY a JSON object, no markdown, no explanation:
   "translatedIssue": "English translation of issue",
   "translatedLocation": "English translation of location",
   "summary": "One sentence summary in English max 15 words",
-  "department": "PWD or Fire Department or Police or Municipal Corporation or Water Board or Electricity Board or Health Department or Traffic Police",
+  "department": "Choose ONLY from: Roads & Infrastructure, Water & Sanitation, Electricity, Health, Law & Order, Municipal Services",
   "urgencyOverride": null
 }
 
@@ -24,7 +24,7 @@ Department rules:
 - Road damage, pothole, fallen tree → PWD
 - Fire, gas leak → Fire Department  
 - Crime, theft → Police
-- Garbage, stray animals, waterlogging, streetlight → Municipal Corporation
+- Garbage, stray animals, waterlogging, streetlight → Municipal Services
 - Water supply, pipeline → Water Board
 - Power cut, electrical fault → Electricity Board
 - Disease, sanitation → Health Department
@@ -57,7 +57,7 @@ Department rules:
       translatedIssue: issueType,
       translatedLocation: location,
       summary: issueType,
-      department: "Municipal Corporation",
+      department: "Municipal Services",
       urgencyOverride: null,
     };
   }

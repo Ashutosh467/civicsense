@@ -259,7 +259,7 @@ app.post("/process", async (req, res) => {
     });
     formData.append("model", "whisper-large-v3");
     formData.append("response_format", "json");
-    formData.append("language", "hi");
+    formData.append("language", "");
 
     const transcriptionResponse = await axios.post(
       "https://api.groq.com/openai/v1/audio/transcriptions",
@@ -297,7 +297,7 @@ Return ONLY valid JSON:
   "urgency": "high/medium/low based on content",
   "emotion": "angry/distressed/frustrated/neutral",
   "summary": "one clear English sentence with location and issue",
-  "department": "Municipal Corporation/Water Department/Electricity Board/Police/Public Works Department/Other",
+  "department": "Choose ONLY from these 6: Roads & Infrastructure (for potholes, road damage, bridges, footpaths), Water & Sanitation (for water supply, drainage, sewage, hand pump), Electricity (for power cut, transformer, street light), Health (for hospital, ambulance, medicine, doctor), Law & Order (for crime, harassment, accident, noise), Municipal Services (for garbage, stray animals, encroachment, parks)",
   "detectedLanguage": "Hindi/Punjabi/Tamil/Telugu/English",
   "isEnglish": true or false,
   "translatedIssue": "English Roman script only",
@@ -347,7 +347,7 @@ Return ONLY valid JSON:
       urgency: extracted.urgency || "low",
       emotion: extracted.emotion || "neutral",
       summary: extracted.summary || "",
-      department: extracted.department || "Municipal Corporation",
+      department: extracted.department || "Municipal Services",
       detectedLanguage: extracted.detectedLanguage || "English",
       isEnglish: extracted.isEnglish !== false,
       translatedIssue: extracted.translatedIssue || extracted.issueType || "",
@@ -418,7 +418,7 @@ Return ONLY valid JSON:
         urgency: "low",
         emotion: "neutral",
         summary: "Complaint received but could not be fully processed",
-        department: "Municipal Corporation",
+        department: "Municipal Services",
         deadlineHours: 24,
         deadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });

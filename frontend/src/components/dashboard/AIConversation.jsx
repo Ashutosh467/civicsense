@@ -9,7 +9,7 @@ export default function AIConversation({ complaint }) {
     "🧠 Intent: " + (complaint.translatedIssue || complaint.issueType || 'Unknown'),
     "😊 Emotion detected: " + (complaint.emotion || 'Neutral'),
     "⚡ Urgency classified: " + (complaint.urgency?.toUpperCase() || 'NORMAL'),
-    "🏛 Routed to: " + (complaint.department || 'Municipal Corporation'),
+    "🏛 Routed to: " + (complaint.department || 'Municipal Services'),
     "📝 Summary: " + (complaint.summary || 'Processing...'),
     complaint.isDuplicate ? "🚨 CLUSTER ALERT! " + complaint.clusterSize + " similar complaints in 24hrs — escalated to HIGH" : "✅ No duplicates detected",
     "💾 Saved to database successfully",

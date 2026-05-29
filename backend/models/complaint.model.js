@@ -10,7 +10,7 @@ const complaintSchema = new mongoose.Schema({
   summary: { type: String, default: "" },
   status: { type: String, default: "pending" },
   time: { type: Date, default: Date.now },
-  department: { type: String, default: "Municipal Corporation" },
+  department: { type: String, default: "Municipal Services" },
   isDuplicate: { type: Boolean, default: false },
   clusterSize: { type: Number, default: 1 },
   detectedLanguage: { type: String, default: "English" },
