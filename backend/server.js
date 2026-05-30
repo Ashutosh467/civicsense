@@ -100,7 +100,7 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({
     status: "OK",
-    database: "Firebase Firestore",
+    database: "MongoDB Atlas",
     realtime: true,
     service: "CivicCall Backend",
   });
