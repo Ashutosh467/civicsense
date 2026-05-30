@@ -59,7 +59,7 @@ export const assignComplaintToOfficer = async (complaintId) => {
   try {
     const complaint = await Complaint.findById(complaintId);
     if (!complaint) {
-      console.error("Auto assign — complaint not found:", complaintId);
+      console.error("Auto assign - complaint not found:", complaintId);
       return { success: false, reason: "Complaint not found" };
     }
 
@@ -109,7 +109,7 @@ export const assignComplaintToOfficer = async (complaintId) => {
       // Department match bonus
       if (officer.department === complaint.department) score += 100;
 
-      // Distance scoring — only if both have GPS
+      // Distance scoring - only if both have GPS
       if (
         complaintCoords &&
         officer.currentLocation?.lat &&
@@ -131,12 +131,12 @@ export const assignComplaintToOfficer = async (complaintId) => {
           `Officer ${officer.name}: distance=${distance.toFixed(2)}km, distanceScore=${distanceScore.toFixed(0)}`,
         );
       } else {
-        // No GPS — give neutral distance score
+        // No GPS - give neutral distance score
         score += 40;
         console.log(`Officer ${officer.name}: no GPS data, neutral score`);
       }
 
-      // Trust score bonus — high urgency goes to trusted officers
+      // Trust score bonus - high urgency goes to trusted officers
       if (complaint.urgencyScore >= 7) {
         score += (officer.trustScore || 70) * 0.2;
       }
@@ -144,7 +144,7 @@ export const assignComplaintToOfficer = async (complaintId) => {
       // Penalize overloaded officers
       score -= officer.activeComplaintsCount * 15;
 
-      // Penalize officers with no GPS — prefer officers sharing location
+      // Penalize officers with no GPS - prefer officers sharing location
       if (!officer.currentLocation?.lat) score -= 20;
 
       console.log(`Officer ${officer.name}: total score=${score.toFixed(0)}`);
