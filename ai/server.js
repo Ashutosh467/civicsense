@@ -297,7 +297,7 @@ Return ONLY valid JSON:
   "urgency": "high/medium/low based on content",
   "emotion": "angry/distressed/frustrated/neutral",
   "summary": "one clear English sentence with location and issue",
-  "department": "Choose ONLY from these 6: Roads & Infrastructure (for potholes, road damage, bridges, footpaths), Water & Sanitation (for water supply, drainage, sewage, hand pump), Electricity (for power cut, transformer, street light), Health (for hospital, ambulance, medicine, doctor), Law & Order (for crime, harassment, accident, noise), Municipal Services (for garbage, stray animals, encroachment, parks)",
+  "department": "Choose ONLY from these 7 departments — Fire Department (for building fire, vehicle fire, gas leak, explosion, rescue, forest fire), Law & Order (for theft, robbery, murder, harassment, riot, missing person, traffic accident, noise complaint), Roads & Infrastructure (for pothole, road damage, bridge repair, footpath broken, road blocked), Water & Sanitation (for no water supply, dirty water, pipeline burst, hand pump, sewage overflow, drain blocked), Electricity (for power cut, transformer blast, street light, low voltage, electric wire fallen), Health (for no doctor, no medicine, ambulance, dirty hospital, dead body, food poisoning), Municipal Services (for garbage, stray animals, encroachment, park maintenance, public toilet, tree fallen)",
   "detectedLanguage": "Hindi/Punjabi/Tamil/Telugu/English",
   "isEnglish": true or false,
   "translatedIssue": "English Roman script only",

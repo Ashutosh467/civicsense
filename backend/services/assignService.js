@@ -4,11 +4,24 @@ import { getIO } from "../sockets/socket.js";
 import axios from "axios";
 
 // ================================
+// URGENCY THRESHOLDS PER DEPARTMENT
+// ================================
+const URGENCY_THRESHOLDS = {
+  "Fire Department": 6,
+  "Law & Order": 6,
+  "Health": 6,
+  "Water & Sanitation": 7,
+  "Electricity": 7,
+  "Roads & Infrastructure": 8,
+  "Municipal Services": 9,
+};
+
+// ================================
 // HAVERSINE DISTANCE FORMULA
-// Returns distance in KM between two GPS points
+// Returns distance in KM
 // ================================
 function haversineDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371; // Earth radius in KM
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a =
@@ -23,7 +36,6 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 
 // ================================
 // GEOCODE LOCATION TEXT TO LAT/LNG
-// Uses OpenStreetMap Nominatim (free, no key needed)
 // ================================
 async function geocodeLocation(locationText) {
   try {
@@ -35,16 +47,13 @@ async function geocodeLocation(locationText) {
           "User-Agent": "CivicCall/1.0 (civic complaint management system)",
         },
         timeout: 5000,
-      },
+      }
     );
-
     if (response.data && response.data.length > 0) {
       const { lat, lon } = response.data[0];
-      console.log(`📍 Geocoded "${locationText}" → ${lat}, ${lon}`);
+      console.log(`Geocoded "${locationText}" to ${lat}, ${lon}`);
       return { lat: parseFloat(lat), lng: parseFloat(lon) };
     }
-
-    console.log(`⚠️ Could not geocode: ${locationText}`);
     return null;
   } catch (err) {
     console.error("Geocoding failed:", err.message);
@@ -53,160 +62,238 @@ async function geocodeLocation(locationText) {
 }
 
 // ================================
+// CHECK IF URGENCY IS HIGH
+// ================================
+function isHighUrgency(complaint) {
+  const threshold = URGENCY_THRESHOLDS[complaint.department] || 7;
+  return (complaint.urgencyScore || 5) >= threshold;
+}
+
+// ================================
+// GET DISTANCE BETWEEN OFFICER AND COMPLAINT
+// ================================
+function getDistance(officer, complaintCoords) {
+  if (
+    !complaintCoords ||
+    !officer.currentLocation?.lat ||
+    !officer.currentLocation?.lng
+  ) {
+    return null;
+  }
+  return haversineDistance(
+    complaintCoords.lat,
+    complaintCoords.lng,
+    officer.currentLocation.lat,
+    officer.currentLocation.lng
+  );
+}
+
+// ================================
+// FIND BEST OFFICER FROM LIST
+// ================================
+function findBestOfficer(officers, complaintCoords, complaint) {
+  let best = null;
+  let bestScore = -Infinity;
+
+  for (const officer of officers) {
+    let score = 0;
+    const distance = getDistance(officer, complaintCoords);
+
+    if (distance !== null) {
+      // Closer = higher score
+      score += Math.max(0, 100 - distance * 2);
+    } else {
+      // No GPS - neutral score
+      score += 40;
+    }
+
+    // Trust score bonus for high urgency
+    if (isHighUrgency(complaint)) {
+      score += (officer.trustScore || 70) * 0.2;
+    }
+
+    // Penalize overloaded officers
+    score -= officer.activeComplaintsCount * 15;
+
+    // Penalize no GPS
+    if (!officer.currentLocation?.lat) score -= 20;
+
+    console.log(`Officer ${officer.name}: score=${score.toFixed(0)}, distance=${distance ? distance.toFixed(1) + "km" : "no GPS"}`);
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = officer;
+    }
+  }
+  return best;
+}
+
+// ================================
+// NOTIFY OFFICER AND UPDATE
+// ================================
+async function assignToOfficer(complaint, officer) {
+  complaint.assignedTo = officer.officerId;
+  complaint.assignedAt = new Date();
+  complaint.status = "assigned";
+  await complaint.save();
+
+  officer.activeComplaintsCount += 1;
+  await officer.save();
+
+  try {
+    const io = getIO();
+    io.emit("complaintAssigned", {
+      complaintId: complaint._id,
+      officerId: officer.officerId,
+      officerName: officer.name,
+    });
+    io.to(officer.officerId).emit("newAssignment", {
+      complaintId: complaint._id,
+    });
+  } catch (e) {
+    console.error("Socket error:", e.message);
+  }
+
+  if (officer.phone) {
+    axios.post(
+      `${process.env.TWILIO_SERVICE_URL}/sms/officer-assigned`,
+      {
+        officerPhone: officer.phone,
+        officerName: officer.name,
+        issueType: complaint.translatedIssue || complaint.issueType,
+        location: complaint.translatedLocation || complaint.location,
+        officerId: officer.officerId,
+      },
+      { headers: { "x-internal-key": process.env.INTERNAL_SECRET } }
+    ).catch(err => console.error("SMS error:", err.message));
+  }
+
+  console.log(`✅ Assigned complaint ${complaint._id} to ${officer.name}`);
+  return { success: true, officerId: officer.officerId, officerName: officer.name };
+}
+
+// ================================
 // MAIN AUTO ASSIGN FUNCTION
 // ================================
 export const assignComplaintToOfficer = async (complaintId) => {
   try {
     const complaint = await Complaint.findById(complaintId);
-    if (!complaint) {
-      console.error("Auto assign - complaint not found:", complaintId);
-      return { success: false, reason: "Complaint not found" };
-    }
+    if (!complaint) return { success: false, reason: "Complaint not found" };
 
-    // Skip if already assigned
     if (["assigned", "in_progress", "resolved"].includes(complaint.status)) {
       return { success: false, reason: "Already assigned" };
     }
 
-    // Find available officers of matching department
-    const availableOfficers = await Officer.find({
+    const highUrgency = isHighUrgency(complaint);
+    const dept = complaint.department;
+    console.log(`\n🔍 Assigning complaint: ${dept} | High urgency: ${highUrgency}`);
+
+    // Geocode complaint location
+    const complaintCoords = await geocodeLocation(
+      complaint.translatedLocation || complaint.location
+    );
+
+    // Get ALL available officers
+    const allOfficers = await Officer.find({
       isAvailable: true,
       isArchived: { $ne: true },
       approvalStatus: "approved",
-      department: complaint.department,
     });
 
-    // If no matching department officer, get any available officer
-    const fallbackOfficers =
-      availableOfficers.length === 0
-        ? await Officer.find({
-            isAvailable: true,
-            isArchived: { $ne: true },
-            approvalStatus: "approved",
-          })
-        : [];
-
-    const officers =
-      availableOfficers.length > 0 ? availableOfficers : fallbackOfficers;
-
-    if (officers.length === 0) {
-      console.log("⚠️ No available officers for complaint:", complaintId);
-      return { success: false, reason: "No available officers" };
+    if (allOfficers.length === 0) {
+      console.log("⚠️ No officers available at all");
+      return { success: false, reason: "No officers available" };
     }
 
-    // Geocode complaint location
-    const complaintLocation =
-      complaint.translatedLocation || complaint.location;
-    const complaintCoords = await geocodeLocation(complaintLocation);
+    // Split by department
+    const deptOfficers = allOfficers.filter(o => o.department === dept);
+    const policeOfficers = allOfficers.filter(o =>
+      o.department === "Law & Order" || o.department === "Police"
+    );
 
-    // Score each officer
-    let bestOfficer = null;
-    let bestScore = -Infinity;
-
-    for (const officer of officers) {
-      let score = 0;
-
-      // Department match bonus
-      if (officer.department === complaint.department) score += 100;
-
-      // Distance scoring - only if both have GPS
-      if (
-        complaintCoords &&
-        officer.currentLocation?.lat &&
-        officer.currentLocation?.lng
-      ) {
-        const distance = haversineDistance(
-          complaintCoords.lat,
-          complaintCoords.lng,
-          officer.currentLocation.lat,
-          officer.currentLocation.lng,
-        );
-
-        // Closer = higher score
-        // Max 80 points for distance (0km = 80pts, 10km = 30pts, 20km+ = 0pts)
-        const distanceScore = Math.max(0, 80 - distance * 4);
-        score += distanceScore;
-
-        console.log(
-          `Officer ${officer.name}: distance=${distance.toFixed(2)}km, distanceScore=${distanceScore.toFixed(0)}`,
-        );
-      } else {
-        // No GPS - give neutral distance score
-        score += 40;
-        console.log(`Officer ${officer.name}: no GPS data, neutral score`);
-      }
-
-      // Trust score bonus - high urgency goes to trusted officers
-      if (complaint.urgencyScore >= 7) {
-        score += (officer.trustScore || 70) * 0.2;
-      }
-
-      // Penalize overloaded officers
-      score -= officer.activeComplaintsCount * 15;
-
-      // Penalize officers with no GPS - prefer officers sharing location
-      if (!officer.currentLocation?.lat) score -= 20;
-
-      console.log(`Officer ${officer.name}: total score=${score.toFixed(0)}`);
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestOfficer = officer;
-      }
+    // ─── LEVEL 1: Same dept + same area (within 5km) ───
+    console.log("→ Level 1: Same dept, same area (5km)");
+    const level1 = deptOfficers.filter(o => {
+      const d = getDistance(o, complaintCoords);
+      if (d !== null) return d <= 5;
+      // text matching fallback
+      const area = (o.area || "").toLowerCase();
+      const loc = (complaint.translatedLocation || complaint.location || "").toLowerCase();
+      return loc.includes(area) || area.includes(loc.split(",")[0]);
+    });
+    if (level1.length > 0) {
+      const best = findBestOfficer(level1, complaintCoords, complaint);
+      if (best) return await assignToOfficer(complaint, best);
     }
 
-    if (!bestOfficer) bestOfficer = officers[0];
+    // ─── LEVEL 2: Same dept + within 20km ───
+    console.log("→ Level 2: Same dept, within 20km");
+    const level2 = deptOfficers.filter(o => {
+      const d = getDistance(o, complaintCoords);
+      return d !== null && d <= 20;
+    });
+    if (level2.length > 0) {
+      const best = findBestOfficer(level2, complaintCoords, complaint);
+      if (best) return await assignToOfficer(complaint, best);
+    }
 
-    // Update complaint
-    complaint.assignedTo = bestOfficer.officerId;
-    complaint.assignedAt = new Date();
-    complaint.status = "assigned";
-    await complaint.save();
-
-    // Update officer
-    bestOfficer.activeComplaintsCount += 1;
-    await bestOfficer.save();
-
-    // Socket events
-    try {
-      const io = getIO();
-      io.emit("complaintAssigned", {
-        complaintId: complaint._id || complaint.id,
-        officerId: bestOfficer.officerId,
-        officerName: bestOfficer.name,
+    // ─── LEVEL 3: Same dept + within 60km (LOW/MEDIUM only) ───
+    if (!highUrgency) {
+      console.log("→ Level 3: Same dept, within 60km (low/medium urgency)");
+      const level3 = deptOfficers.filter(o => {
+        const d = getDistance(o, complaintCoords);
+        return d !== null && d <= 60;
       });
-      io.to(bestOfficer.officerId).emit("newAssignment", {
-        complaintId: complaint._id || complaint.id,
+      if (level3.length > 0) {
+        const best = findBestOfficer(level3, complaintCoords, complaint);
+        if (best) return await assignToOfficer(complaint, best);
+      }
+
+      // Also try dept officers with no GPS at level 3
+      const level3NoGPS = deptOfficers.filter(o => !o.currentLocation?.lat);
+      if (level3NoGPS.length > 0) {
+        const best = findBestOfficer(level3NoGPS, complaintCoords, complaint);
+        if (best) return await assignToOfficer(complaint, best);
+      }
+    } else {
+      console.log("→ Level 3: SKIPPED (high urgency)");
+    }
+
+    // ─── LEVEL 4: Police officer in same area ───
+    console.log("→ Level 4: Police fallback in same area");
+    const level4 = policeOfficers.filter(o => {
+      const d = getDistance(o, complaintCoords);
+      if (d !== null) return d <= 10;
+      const area = (o.area || "").toLowerCase();
+      const loc = (complaint.translatedLocation || complaint.location || "").toLowerCase();
+      return loc.includes(area) || area.includes(loc.split(",")[0]);
+    });
+    if (level4.length > 0) {
+      const best = findBestOfficer(level4, complaintCoords, complaint);
+      if (best) return await assignToOfficer(complaint, best);
+    }
+
+    // ─── LEVEL 5: Any nearest available officer ───
+    console.log("→ Level 5: Any nearest officer");
+    const best = findBestOfficer(allOfficers, complaintCoords, complaint);
+    if (best) return await assignToOfficer(complaint, best);
+
+    // ─── LEVEL 6: Escalate to admin ───
+    console.log("→ Level 6: No officer found - escalating to admin");
+    try {
+      getIO().emit("noOfficerAvailable", {
+        complaintId: complaint._id,
+        department: dept,
+        location: complaint.translatedLocation || complaint.location,
+        urgencyScore: complaint.urgencyScore,
+        message: `No ${dept} officer available for complaint in ${complaint.location}`,
       });
     } catch (e) {
-      console.error("Socket error on assign:", e.message);
+      console.error("Socket error:", e.message);
     }
 
-    // SMS to officer
-    if (bestOfficer.phone) {
-      axios
-        .post(
-          `${process.env.TWILIO_SERVICE_URL}/sms/officer-assigned`,
-          {
-            officerPhone: bestOfficer.phone,
-            officerName: bestOfficer.name,
-            issueType: complaint.translatedIssue || complaint.issueType,
-            location: complaint.translatedLocation || complaint.location,
-            officerId: bestOfficer.officerId,
-          },
-          { headers: { "x-internal-key": process.env.INTERNAL_SECRET } },
-        )
-        .catch((err) => console.error("Officer SMS error:", err.message));
-    }
+    return { success: false, reason: "No officer available - admin alerted" };
 
-    console.log(
-      `✅ Auto assigned complaint ${complaintId} to officer ${bestOfficer.name} (score: ${bestScore.toFixed(0)})`,
-    );
-    return {
-      success: true,
-      officerId: bestOfficer.officerId,
-      officerName: bestOfficer.name,
-    };
   } catch (error) {
     console.error("Auto assign error:", error.message);
     return { success: false, reason: error.message };
