@@ -3,9 +3,6 @@ import Officer from "../models/officer.model.js";
 import { getIO } from "../sockets/socket.js";
 import axios from "axios";
 
-// ================================
-// URGENCY THRESHOLDS PER DEPARTMENT
-// ================================
 const URGENCY_THRESHOLDS = {
   "Fire Department": 6,
   "Law & Order": 6,
@@ -16,10 +13,6 @@ const URGENCY_THRESHOLDS = {
   "Municipal Services": 9,
 };
 
-// ================================
-// HAVERSINE DISTANCE FORMULA
-// Returns distance in KM
-// ================================
 function haversineDistance(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -34,24 +27,18 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
-// ================================
-// GEOCODE LOCATION TEXT TO LAT/LNG
-// ================================
 async function geocodeLocation(locationText) {
   try {
-    const query = encodeURIComponent(locationText + ", India");
+    const query = encodeURIComponent(locationText + ", Bihar, India");
     const response = await axios.get(
       `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
       {
-        headers: {
-          "User-Agent": "CivicCall/1.0 (civic complaint management system)",
-        },
+        headers: { "User-Agent": "CivicCall/1.0" },
         timeout: 5000,
       }
     );
     if (response.data && response.data.length > 0) {
       const { lat, lon } = response.data[0];
-      console.log(`Geocoded "${locationText}" to ${lat}, ${lon}`);
       return { lat: parseFloat(lat), lng: parseFloat(lon) };
     }
     return null;
@@ -61,25 +48,43 @@ async function geocodeLocation(locationText) {
   }
 }
 
-// ================================
-// CHECK IF URGENCY IS HIGH
-// ================================
 function isHighUrgency(complaint) {
   const threshold = URGENCY_THRESHOLDS[complaint.department] || 7;
   return (complaint.urgencyScore || 5) >= threshold;
 }
 
 // ================================
-// GET DISTANCE BETWEEN OFFICER AND COMPLAINT
+// IMPROVED TEXT MATCHING
+// Checks if officer area matches complaint location
 // ================================
+function textAreaMatch(officerArea, complaintLocation) {
+  if (!officerArea || !complaintLocation) return false;
+  
+  const area = officerArea.toLowerCase().trim();
+  const loc = complaintLocation.toLowerCase().trim();
+  
+  // Extract all keywords from both
+  const areaWords = area.split(/[\s,]+/).filter(w => w.length > 2);
+  const locWords = loc.split(/[\s,]+/).filter(w => w.length > 2);
+  
+  // Check if any word matches
+  for (const word of areaWords) {
+    if (locWords.includes(word)) return true;
+    if (loc.includes(word)) return true;
+  }
+  for (const word of locWords) {
+    if (area.includes(word)) return true;
+  }
+  
+  return false;
+}
+
 function getDistance(officer, complaintCoords) {
   if (
     !complaintCoords ||
     !officer.currentLocation?.lat ||
     !officer.currentLocation?.lng
-  ) {
-    return null;
-  }
+  ) return null;
   return haversineDistance(
     complaintCoords.lat,
     complaintCoords.lng,
@@ -88,9 +93,6 @@ function getDistance(officer, complaintCoords) {
   );
 }
 
-// ================================
-// FIND BEST OFFICER FROM LIST
-// ================================
 function findBestOfficer(officers, complaintCoords, complaint) {
   let best = null;
   let bestScore = -Infinity;
@@ -100,25 +102,26 @@ function findBestOfficer(officers, complaintCoords, complaint) {
     const distance = getDistance(officer, complaintCoords);
 
     if (distance !== null) {
-      // Closer = higher score
       score += Math.max(0, 100 - distance * 2);
     } else {
-      // No GPS - neutral score
-      score += 40;
+      // No GPS - use text match bonus
+      const isMatch = textAreaMatch(
+        officer.area,
+        complaint.translatedLocation || complaint.location
+      );
+      score += isMatch ? 60 : 20;
     }
 
-    // Trust score bonus for high urgency
     if (isHighUrgency(complaint)) {
       score += (officer.trustScore || 70) * 0.2;
     }
 
-    // Penalize overloaded officers
     score -= officer.activeComplaintsCount * 15;
+    if (!officer.currentLocation?.lat) score -= 10;
 
-    // Penalize no GPS
-    if (!officer.currentLocation?.lat) score -= 20;
-
-    console.log(`Officer ${officer.name}: score=${score.toFixed(0)}, distance=${distance ? distance.toFixed(1) + "km" : "no GPS"}`);
+    console.log(
+      `Officer ${officer.name} (${officer.department}): score=${score.toFixed(0)}, distance=${distance ? distance.toFixed(1) + "km" : "no GPS"}, area=${officer.area}`
+    );
 
     if (score > bestScore) {
       bestScore = score;
@@ -128,9 +131,6 @@ function findBestOfficer(officers, complaintCoords, complaint) {
   return best;
 }
 
-// ================================
-// NOTIFY OFFICER AND UPDATE
-// ================================
 async function assignToOfficer(complaint, officer) {
   complaint.assignedTo = officer.officerId;
   complaint.assignedAt = new Date();
@@ -168,32 +168,29 @@ async function assignToOfficer(complaint, officer) {
     ).catch(err => console.error("SMS error:", err.message));
   }
 
-  console.log(`✅ Assigned complaint ${complaint._id} to ${officer.name}`);
+  console.log(`✅ Assigned complaint ${complaint._id} to ${officer.name} (${officer.department}, ${officer.area})`);
   return { success: true, officerId: officer.officerId, officerName: officer.name };
 }
 
-// ================================
-// MAIN AUTO ASSIGN FUNCTION
-// ================================
 export const assignComplaintToOfficer = async (complaintId) => {
   try {
     const complaint = await Complaint.findById(complaintId);
     if (!complaint) return { success: false, reason: "Complaint not found" };
 
-    if (["assigned", "in_progress", "resolved"].includes(complaint.status)) {
-      return { success: false, reason: "Already assigned" };
+    if (["assigned", "in_progress", "resolved", "escalated"].includes(complaint.status)) {
+      return { success: false, reason: "Already assigned or escalated" };
     }
 
     const highUrgency = isHighUrgency(complaint);
     const dept = complaint.department;
-    console.log(`\n🔍 Assigning complaint: ${dept} | High urgency: ${highUrgency}`);
+    const complaintLoc = complaint.translatedLocation || complaint.location;
+
+    console.log(`\n🔍 Assigning: "${dept}" at "${complaintLoc}" | High urgency: ${highUrgency}`);
 
     // Geocode complaint location
-    const complaintCoords = await geocodeLocation(
-      complaint.translatedLocation || complaint.location
-    );
+    const complaintCoords = await geocodeLocation(complaintLoc);
+    console.log(`📍 Coords: ${complaintCoords ? `${complaintCoords.lat}, ${complaintCoords.lng}` : "not found"}`);
 
-    // Get ALL available officers
     const allOfficers = await Officer.find({
       isAvailable: true,
       isArchived: { $ne: true },
@@ -201,37 +198,36 @@ export const assignComplaintToOfficer = async (complaintId) => {
     });
 
     if (allOfficers.length === 0) {
-      console.log("⚠️ No officers available at all");
       return { success: false, reason: "No officers available" };
     }
 
-    // Split by department
     const deptOfficers = allOfficers.filter(o => o.department === dept);
     const policeOfficers = allOfficers.filter(o =>
       o.department === "Law & Order" || o.department === "Police"
     );
 
-    // ─── LEVEL 1: Same dept + same area (within 5km) ───
-    console.log("→ Level 1: Same dept, same area (5km)");
+    console.log(`Found ${deptOfficers.length} officers for ${dept}`);
+
+    // ─── LEVEL 1: Same dept + same area (GPS 5km OR text match) ───
+    console.log("→ Level 1: Same dept, same area");
     const level1 = deptOfficers.filter(o => {
       const d = getDistance(o, complaintCoords);
       if (d !== null) return d <= 5;
-      // text matching fallback
-      const area = (o.area || "").toLowerCase();
-      const loc = (complaint.translatedLocation || complaint.location || "").toLowerCase();
-      return loc.includes(area) || area.includes(loc.split(",")[0]);
+      return textAreaMatch(o.area, complaintLoc);
     });
+    console.log(`   Level 1 candidates: ${level1.map(o => o.name).join(", ") || "none"}`);
     if (level1.length > 0) {
       const best = findBestOfficer(level1, complaintCoords, complaint);
       if (best) return await assignToOfficer(complaint, best);
     }
 
-    // ─── LEVEL 2: Same dept + within 20km ───
-    console.log("→ Level 2: Same dept, within 20km");
+    // ─── LEVEL 2: Same dept + within 20km GPS ───
+    console.log("→ Level 2: Same dept, within 20km GPS");
     const level2 = deptOfficers.filter(o => {
       const d = getDistance(o, complaintCoords);
       return d !== null && d <= 20;
     });
+    console.log(`   Level 2 candidates: ${level2.map(o => o.name).join(", ") || "none"}`);
     if (level2.length > 0) {
       const best = findBestOfficer(level2, complaintCoords, complaint);
       if (best) return await assignToOfficer(complaint, best);
@@ -239,18 +235,18 @@ export const assignComplaintToOfficer = async (complaintId) => {
 
     // ─── LEVEL 3: Same dept + within 60km (LOW/MEDIUM only) ───
     if (!highUrgency) {
-      console.log("→ Level 3: Same dept, within 60km (low/medium urgency)");
-      const level3 = deptOfficers.filter(o => {
+      console.log("→ Level 3: Same dept, within 60km");
+      const level3GPS = deptOfficers.filter(o => {
         const d = getDistance(o, complaintCoords);
         return d !== null && d <= 60;
       });
-      if (level3.length > 0) {
-        const best = findBestOfficer(level3, complaintCoords, complaint);
+      if (level3GPS.length > 0) {
+        const best = findBestOfficer(level3GPS, complaintCoords, complaint);
         if (best) return await assignToOfficer(complaint, best);
       }
-
-      // Also try dept officers with no GPS at level 3
+      // No GPS officers at level 3
       const level3NoGPS = deptOfficers.filter(o => !o.currentLocation?.lat);
+      console.log(`   Level 3 no-GPS candidates: ${level3NoGPS.map(o => o.name).join(", ") || "none"}`);
       if (level3NoGPS.length > 0) {
         const best = findBestOfficer(level3NoGPS, complaintCoords, complaint);
         if (best) return await assignToOfficer(complaint, best);
@@ -259,15 +255,14 @@ export const assignComplaintToOfficer = async (complaintId) => {
       console.log("→ Level 3: SKIPPED (high urgency)");
     }
 
-    // ─── LEVEL 4: Police officer in same area ───
-    console.log("→ Level 4: Police fallback in same area");
+    // ─── LEVEL 4: Police officer same area ───
+    console.log("→ Level 4: Police fallback");
     const level4 = policeOfficers.filter(o => {
       const d = getDistance(o, complaintCoords);
       if (d !== null) return d <= 10;
-      const area = (o.area || "").toLowerCase();
-      const loc = (complaint.translatedLocation || complaint.location || "").toLowerCase();
-      return loc.includes(area) || area.includes(loc.split(",")[0]);
+      return textAreaMatch(o.area, complaintLoc);
     });
+    console.log(`   Level 4 candidates: ${level4.map(o => o.name).join(", ") || "none"}`);
     if (level4.length > 0) {
       const best = findBestOfficer(level4, complaintCoords, complaint);
       if (best) return await assignToOfficer(complaint, best);
@@ -278,15 +273,14 @@ export const assignComplaintToOfficer = async (complaintId) => {
     const best = findBestOfficer(allOfficers, complaintCoords, complaint);
     if (best) return await assignToOfficer(complaint, best);
 
-    // ─── LEVEL 6: Escalate to admin ───
-    console.log("→ Level 6: No officer found - escalating to admin");
+    // ─── LEVEL 6: No officer — alert admin ───
+    console.log("→ Level 6: No officer found");
     try {
       getIO().emit("noOfficerAvailable", {
         complaintId: complaint._id,
         department: dept,
-        location: complaint.translatedLocation || complaint.location,
-        urgencyScore: complaint.urgencyScore,
-        message: `No ${dept} officer available for complaint in ${complaint.location}`,
+        location: complaintLoc,
+        message: `No ${dept} officer available for ${complaintLoc}`,
       });
     } catch (e) {
       console.error("Socket error:", e.message);
