@@ -1,3 +1,4 @@
+import { geocodeArea } from "../services/geocodeService.js";
 import Officer from "../models/officer.model.js";
 import Complaint from "../models/complaint.model.js";
 import { getIO } from "../sockets/socket.js";
@@ -9,12 +10,18 @@ export const createOfficer = async (req, res) => {
     const { name, area, department, phone } = req.body;
     const officerId = "officer_" + Date.now();
 
+    // Geocode officer area automatically
+    let coords = null;
+    if (area) {
+      coords = await geocodeArea(area);
+    }
     const newOfficer = await Officer.create({
       officerId,
       name,
       area,
       department,
-      phone
+      phone,
+      currentLocation: coords ? { lat: coords.lat, lng: coords.lng } : { lat: null, lng: null }
     });
 
     res.status(201).json(newOfficer);

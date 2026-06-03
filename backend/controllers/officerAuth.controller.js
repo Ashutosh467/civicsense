@@ -1,3 +1,4 @@
+import { geocodeArea } from "../services/geocodeService.js";
 import Officer from "../models/officer.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -89,7 +90,15 @@ export const approveOfficer = async (req, res) => {
 
     officer.approvalStatus = action === "approve" ? "approved" : "rejected";
     if (action === "approve") {
-      if (area && area.trim()) officer.area = area.trim();
+      if (area && area.trim()) {
+        officer.area = area.trim();
+        // Geocode area automatically
+        const coords = await geocodeArea(area.trim());
+        if (coords) {
+          officer.currentLocation = { lat: coords.lat, lng: coords.lng };
+          console.log("📍 Officer location geocoded:", coords);
+        }
+      }
       if (department && department.trim()) officer.department = department.trim();
     }
     await officer.save();
