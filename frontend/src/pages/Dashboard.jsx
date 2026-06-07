@@ -7,22 +7,50 @@ import { socket } from "../services/socket";
 import toast from "react-hot-toast";
 import ComplaintTable from "../components/ComplaintTable";
 import OverviewCard from "../components/OverviewCard";
+const DEPARTMENTS = [
+  "PWD",
+  "Fire Department",
+  "Law & Order",
+  "Roads & Infrastructure",
+  "Water & Sanitation",
+  "Electricity",
+  "Health",
+  "Municipal Services",
+  "Police",
+  "Other",
+];
 
 function Dashboard() {
   const [complaints, setComplaints] = useState([]);
   const [officers, setOfficers] = useState([]);
   const [pendingOfficers, setPendingOfficers] = useState([]);
   const [isOfficersExpanded, setIsOfficersExpanded] = useState(false);
-  const [newOfficer, setNewOfficer] = useState({ name: "", area: "", department: "PWD", phone: "" });
+  const [newOfficer, setNewOfficer] = useState({
+    name: "",
+    area: "",
+    department: "PWD",
+    phone: "",
+  });
   const [activeTab, setActiveTab] = useState("overview");
   const [filter, setFilter] = useState("All");
-  const [deleteModal, setDeleteModal] = useState({ open: false, type: "", id: "", name: "" });
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    type: "",
+    id: "",
+    name: "",
+  });
 
   const fetchOfficers = async () => {
     try {
       const res = await fetch(`${API}/api/officer`);
       const data = await res.json();
-      setOfficers(Array.isArray(data) ? data.filter(o => o.approvalStatus === "approved" || !o.approvalStatus) : []);
+      setOfficers(
+        Array.isArray(data)
+          ? data.filter(
+              (o) => o.approvalStatus === "approved" || !o.approvalStatus,
+            )
+          : [],
+      );
     } catch (err) {
       console.error("Failed to fetch officers", err);
     }
@@ -61,41 +89,57 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const fetchData = () => {
-      fetch(`${API}/api/complaint`, { cache: "no-store" })
-        .then((res) => res.json())
-        .then((data) => { if (data && Array.isArray(data)) setComplaints(data); })
-        .catch((err) => console.error("Backend not reachable", err));
-    };
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
+    fetch(`${API}/api/complaint`, { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Array.isArray(data)) setComplaints(data);
+      })
+      .catch((err) => console.error("Backend not reachable", err));
+
     socket.connect();
     socket.on("connect", () => console.log("✅ Socket connected:", socket.id));
-    socket.on("newComplaint", (data) => setComplaints((prev) => [data, ...prev]));
+    socket.on("newComplaint", (data) =>
+      setComplaints((prev) => [data, ...prev]),
+    );
     socket.on("complaintAssigned", (data) => {
-      setComplaints((prev) => prev.map((c) => {
-        const cid = c.id || c._id;
-        if (cid === data.complaintId) return { ...c, status: "assigned", assignedTo: data.officerId };
-        return c;
-      }));
+      setComplaints((prev) =>
+        prev.map((c) => {
+          const cid = c.id || c._id;
+          if (cid === data.complaintId)
+            return { ...c, status: "assigned", assignedTo: data.officerId };
+          return c;
+        }),
+      );
       fetchOfficers();
     });
     socket.on("complaintResolved", (data) => {
-      setComplaints((prev) => prev.map((c) => {
-        const cid = c.id || c._id;
-        const updatedId = data.id || data._id;
-        return cid === updatedId ? { ...c, ...data } : c;
-      }));
+      setComplaints((prev) =>
+        prev.map((c) => {
+          const cid = c.id || c._id;
+          const updatedId = data.id || data._id;
+          return cid === updatedId ? { ...c, ...data } : c;
+        }),
+      );
       fetchOfficers();
     });
-    return () => { clearInterval(interval); socket.disconnect(); };
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const totalComplaints = complaints.length;
-  const pendingCount = complaints.filter((c) => c.status?.toLowerCase() === "pending").length;
-  const resolvedCount = complaints.filter((c) => c.status?.toLowerCase() === "resolved").length;
-  const highUrgencyCount = complaints.filter((c) => c.urgency?.toLowerCase() === "high").length;
-  const angryComplaints = complaints.filter((c) => c.emotion?.toLowerCase() === "angry");
+  const pendingCount = complaints.filter(
+    (c) => c.status?.toLowerCase() === "pending",
+  ).length;
+  const resolvedCount = complaints.filter(
+    (c) => c.status?.toLowerCase() === "resolved",
+  ).length;
+  const highUrgencyCount = complaints.filter(
+    (c) => c.urgency?.toLowerCase() === "high",
+  ).length;
+  const angryComplaints = complaints.filter(
+    (c) => c.emotion?.toLowerCase() === "angry",
+  );
   const angryCount = angryComplaints.length;
   const alertLocation = angryCount >= 3 ? angryComplaints[0].location : null;
   const locationCounts = {};
@@ -103,7 +147,9 @@ function Dashboard() {
     const locKey = c.translatedLocation || c.location || "Unknown";
     locationCounts[locKey] = (locationCounts[locKey] || 0) + 1;
   });
-  const patternLocation = Object.keys(locationCounts).find((loc) => locationCounts[loc] >= 5);
+  const patternLocation = Object.keys(locationCounts).find(
+    (loc) => locationCounts[loc] >= 5,
+  );
   const uniqueLocations = new Set();
   complaints.forEach((c) => {
     if (c.status?.toLowerCase() !== "resolved") {
@@ -112,9 +158,36 @@ function Dashboard() {
   });
   const affectedRegionsCount = uniqueLocations.size;
 
-  const activeComplaints = complaints.filter((c) => c.status?.toLowerCase() !== "resolved");
-  const resolvedComplaints = complaints.filter((c) => c.status?.toLowerCase() === "resolved");
-  const escalatedComplaints = complaints.filter(c => c.status === "escalated");
+  const activeComplaints = complaints.filter(
+    (c) => c.status?.toLowerCase() !== "resolved",
+  );
+  const resolvedComplaints = complaints.filter(
+    (c) => c.status?.toLowerCase() === "resolved",
+  );
+  const escalatedComplaints = complaints.filter(
+    (c) => c.status === "escalated",
+  );
+
+  const handleAutoAssign = async (complaintId) => {
+    try {
+      const res = await fetch(`${API}/api/complaint/${complaintId}/assign`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        toast.success("Complaint re-assigned successfully");
+        fetchOfficers();
+        const res2 = await fetch(`${API}/api/complaint`, {
+          cache: "no-store",
+        });
+        const data = await res2.json();
+        if (data && Array.isArray(data)) setComplaints(data);
+      } else {
+        toast.error("Re-assign failed — no available officer");
+      }
+    } catch {
+      toast.error("Network error during re-assign");
+    }
+  };
 
   const confirmDelete = (type, id, name) => {
     setDeleteModal({ open: true, type, id, name });
@@ -123,13 +196,17 @@ function Dashboard() {
   const handleDelete = async () => {
     const { type, id } = deleteModal;
     try {
-      const url = type === "complaint"
-        ? `${API}/api/complaint/${id}/archive`
-        : `${API}/api/officer/${id}/archive`;
+      const url =
+        type === "complaint"
+          ? `${API}/api/complaint/${id}/archive`
+          : `${API}/api/officer/${id}/archive`;
       const res = await fetch(url, { method: "PATCH" });
       if (res.ok) {
-        toast.success(`${type === "complaint" ? "Complaint" : "Officer"} archived successfully`);
-        if (type === "complaint") setComplaints(prev => prev.filter(c => (c.id || c._id) !== id));
+        toast.success(
+          `${type === "complaint" ? "Complaint" : "Officer"} archived successfully`,
+        );
+        if (type === "complaint")
+          setComplaints((prev) => prev.filter((c) => (c.id || c._id) !== id));
         else fetchOfficers();
       } else {
         toast.error("Archive failed");
@@ -144,7 +221,11 @@ function Dashboard() {
   const tabs = [
     { id: "overview", label: "Overview", icon: "📊" },
     { id: "active", label: `Active (${activeComplaints.length})`, icon: "⚡" },
-    { id: "resolved", label: `Resolved (${resolvedComplaints.length})`, icon: "✅" },
+    {
+      id: "resolved",
+      label: `Resolved (${resolvedComplaints.length})`,
+      icon: "✅",
+    },
     { id: "officers", label: `Officers (${officers.length})`, icon: "👮" },
   ];
 
@@ -154,13 +235,21 @@ function Dashboard() {
       {deleteModal.open && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#1E293B] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-white font-bold text-lg mb-2">Confirm Archive</h3>
+            <h3 className="text-white font-bold text-lg mb-2">
+              Confirm Archive
+            </h3>
             <p className="text-gray-400 text-sm mb-6">
-              Are you sure you want to archive <span className="text-white font-medium">"{deleteModal.name}"</span>? It will be hidden from the dashboard but kept in the database.
+              Are you sure you want to archive{" "}
+              <span className="text-white font-medium">
+                "{deleteModal.name}"
+              </span>
+              ? It will be hidden from the dashboard but kept in the database.
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setDeleteModal({ open: false, type: "", id: "", name: "" })}
+                onClick={() =>
+                  setDeleteModal({ open: false, type: "", id: "", name: "" })
+                }
                 className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2.5 rounded-xl text-sm font-medium transition"
               >
                 Cancel
@@ -194,21 +283,33 @@ function Dashboard() {
           <div className="flex items-center gap-2 mb-3">
             <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
             <h3 className="text-orange-400 font-semibold text-sm">
-              {pendingOfficers.length} Officer{pendingOfficers.length > 1 ? "s" : ""} Awaiting Approval
+              {pendingOfficers.length} Officer
+              {pendingOfficers.length > 1 ? "s" : ""} Awaiting Approval
             </h3>
           </div>
           <div className="space-y-3">
             {pendingOfficers.map((o) => {
-              const existingAreas = [...new Set(officers.filter(of => of.area && of.area !== "Unassigned").map(of => of.area))];
+              const existingAreas = [
+                ...new Set(
+                  officers
+                    .filter((of) => of.area && of.area !== "Unassigned")
+                    .map((of) => of.area),
+                ),
+              ];
               return (
-                <div key={o.officerId} className="bg-slate-900/50 rounded-lg px-3 py-3 space-y-2">
+                <div
+                  key={o.officerId}
+                  className="bg-slate-900/50 rounded-lg px-3 py-3 space-y-2"
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-white text-sm font-medium">{o.name}</p>
                       <p className="text-gray-400 text-xs">{o.email}</p>
                     </div>
                     <button
-                      onClick={() => handleOfficerApproval(o.officerId, "reject")}
+                      onClick={() =>
+                        handleOfficerApproval(o.officerId, "reject")
+                      }
                       className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1 rounded-lg hover:bg-red-500/30 transition font-medium"
                     >
                       Reject
@@ -222,24 +323,39 @@ function Dashboard() {
                         placeholder="Assign Area (e.g. Sector 12)"
                         defaultValue={o.area === "Unassigned" ? "" : o.area}
                         onChange={(e) => {
-                          setPendingOfficers(prev =>
-                            prev.map(p => p.officerId === o.officerId ? { ...p, _area: e.target.value } : p)
+                          setPendingOfficers((prev) =>
+                            prev.map((p) =>
+                              p.officerId === o.officerId
+                                ? { ...p, _area: e.target.value }
+                                : p,
+                            ),
                           );
                         }}
                         className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-orange-500 placeholder:text-gray-600"
                       />
                       <datalist id={`areas-${o.officerId}`}>
-                        {existingAreas.map((area, i) => <option key={i} value={area} />)}
+                        {existingAreas.map((area, i) => (
+                          <option key={i} value={area} />
+                        ))}
                       </datalist>
                       {existingAreas.length > 0 && (
-                        <p className="text-gray-500 text-[10px] mt-1 pl-1">{existingAreas.length} existing area{existingAreas.length > 1 ? "s" : ""} available</p>
+                        <p className="text-gray-500 text-[10px] mt-1 pl-1">
+                          {existingAreas.length} existing area
+                          {existingAreas.length > 1 ? "s" : ""} available
+                        </p>
                       )}
                     </div>
                     <select
-                      defaultValue={o.department === "Unassigned" ? "" : o.department}
+                      defaultValue={
+                        o.department === "Unassigned" ? "" : o.department
+                      }
                       onChange={(e) => {
-                        setPendingOfficers(prev =>
-                          prev.map(p => p.officerId === o.officerId ? { ...p, _department: e.target.value } : p)
+                        setPendingOfficers((prev) =>
+                          prev.map((p) =>
+                            p.officerId === o.officerId
+                              ? { ...p, _department: e.target.value }
+                              : p,
+                          ),
                         );
                       }}
                       className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-orange-500"
@@ -248,24 +364,40 @@ function Dashboard() {
                       <option value="PWD">PWD</option>
                       <option value="Fire Department">Fire Department</option>
                       <option value="Law &amp; Order">Law &amp; Order</option>
-                      <option value="Roads &amp; Infrastructure">Roads &amp; Infrastructure</option>
-                      <option value="Water &amp; Sanitation">Water &amp; Sanitation</option>
+                      <option value="Roads &amp; Infrastructure">
+                        Roads &amp; Infrastructure
+                      </option>
+                      <option value="Water &amp; Sanitation">
+                        Water &amp; Sanitation
+                      </option>
                       <option value="Electricity">Electricity</option>
                       <option value="Health">Health</option>
-                      <option value="Municipal Services">Municipal Services</option>
-                      <option value="Water &amp; Sanitation">Water &amp; Sanitation</option>
+                      <option value="Municipal Services">
+                        Municipal Services
+                      </option>
+                      <option value="Water &amp; Sanitation">
+                        Water &amp; Sanitation
+                      </option>
                       <option value="Electricity">Electricity</option>
                       <option value="Health">Health</option>
                       <option value="Law &amp; Order">Law &amp; Order</option>
-                      <option value="Municipal Services">Municipal Services</option>
-                      
-                      
+                      <option value="Municipal Services">
+                        Municipal Services
+                      </option>
+
                       <option value="Police">Police</option>
                       <option value="Other">Other</option>
                     </select>
                   </div>
                   <button
-                    onClick={() => handleOfficerApproval(o.officerId, "approve", o._area, o._department)}
+                    onClick={() =>
+                      handleOfficerApproval(
+                        o.officerId,
+                        "approve",
+                        o._area,
+                        o._department,
+                      )
+                    }
                     className="w-full text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-3 py-1.5 rounded-lg hover:bg-green-500/30 transition font-medium"
                   >
                     ✓ Approve & Assign
@@ -299,11 +431,36 @@ function Dashboard() {
       {activeTab === "overview" && (
         <div className="space-y-6">
           <div className="grid grid-cols-5 gap-4">
-            <StatCard title="Total Calls" value={totalComplaints} icon="📞" color="text-cyan-400" />
-            <StatCard title="Total Complaints" value={totalComplaints} icon="📋" color="text-purple-400" />
-            <StatCard title="Pending Cases" value={pendingCount} icon="⏳" color="text-orange-400" />
-            <StatCard title="Resolved Cases" value={resolvedCount} icon="✅" color="text-green-400" />
-            <StatCard title="Affected Regions" value={affectedRegionsCount} icon="📍" color="text-red-400" />
+            <StatCard
+              title="Total Calls"
+              value={totalComplaints}
+              icon="📞"
+              color="text-cyan-400"
+            />
+            <StatCard
+              title="Total Complaints"
+              value={totalComplaints}
+              icon="📋"
+              color="text-purple-400"
+            />
+            <StatCard
+              title="Pending Cases"
+              value={pendingCount}
+              icon="⏳"
+              color="text-orange-400"
+            />
+            <StatCard
+              title="Resolved Cases"
+              value={resolvedCount}
+              icon="✅"
+              color="text-green-400"
+            />
+            <StatCard
+              title="Affected Regions"
+              value={affectedRegionsCount}
+              icon="📍"
+              color="text-red-400"
+            />
           </div>
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-8">
@@ -328,15 +485,26 @@ function Dashboard() {
                 </span>
               </h2>
               <div className="space-y-3">
-                {escalatedComplaints.map(c => (
-                  <div key={c._id} className="bg-red-950/40 border border-red-500/50 rounded-xl p-4 flex items-center justify-between gap-4">
+                {escalatedComplaints.map((c) => (
+                  <div
+                    key={c._id}
+                    className="bg-red-950/40 border border-red-500/50 rounded-xl p-4 flex items-center justify-between gap-4"
+                  >
                     <div className="flex-1">
-                      <p className="text-white font-semibold">{c.translatedIssue || c.issueType}</p>
-                      <p className="text-red-300 text-sm">{c.translatedLocation || c.location}</p>
+                      <p className="text-white font-semibold">
+                        {c.translatedIssue || c.issueType}
+                      </p>
+                      <p className="text-red-300 text-sm">
+                        {c.translatedLocation || c.location}
+                      </p>
                       <p className="text-red-400 text-xs mt-1">
-                        Officer ID: <span className="font-mono">{c.assignedTo}</span> &nbsp;·&nbsp;
-                        Department: {c.department} &nbsp;·&nbsp;
-                        Escalated: {c.escalatedAt ? new Date(c.escalatedAt).toLocaleString() : "—"}
+                        Officer ID:{" "}
+                        <span className="font-mono">{c.assignedTo}</span>{" "}
+                        &nbsp;·&nbsp; Department: {c.department} &nbsp;·&nbsp;
+                        Escalated:{" "}
+                        {c.escalatedAt
+                          ? new Date(c.escalatedAt).toLocaleString()
+                          : "—"}
                       </p>
                     </div>
                     <button
@@ -351,14 +519,18 @@ function Dashboard() {
             </div>
           )}
           <div className="flex items-center justify-between">
-            <h2 className="text-white font-semibold text-lg">Active Complaints</h2>
+            <h2 className="text-white font-semibold text-lg">
+              Active Complaints
+            </h2>
             <div className="flex gap-2">
               {["All", "High", "Medium", "Low"].map((type) => (
                 <button
                   key={type}
                   onClick={() => setFilter(type)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                    filter === type ? "bg-cyan-500 text-white" : "bg-slate-700 text-gray-300 hover:bg-slate-600"
+                    filter === type
+                      ? "bg-cyan-500 text-white"
+                      : "bg-slate-700 text-gray-300 hover:bg-slate-600"
                   }`}
                 >
                   {type}
@@ -371,7 +543,9 @@ function Dashboard() {
             complaints={
               filter === "All"
                 ? activeComplaints
-                : activeComplaints.filter((c) => c.urgency?.toLowerCase() === filter.toLowerCase())
+                : activeComplaints.filter(
+                    (c) => c.urgency?.toLowerCase() === filter.toLowerCase(),
+                  )
             }
             officers={officers}
           />
@@ -382,8 +556,12 @@ function Dashboard() {
       {activeTab === "resolved" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-white font-semibold text-lg">Resolved Complaints</h2>
-            <p className="text-xs text-gray-400">Archive to remove from dashboard permanently</p>
+            <h2 className="text-white font-semibold text-lg">
+              Resolved Complaints
+            </h2>
+            <p className="text-xs text-gray-400">
+              Archive to remove from dashboard permanently
+            </p>
           </div>
           <div className="bg-[#111827] rounded-xl border border-white/10 overflow-hidden">
             <table className="w-full text-left text-sm text-gray-300">
@@ -400,33 +578,60 @@ function Dashboard() {
               </thead>
               <tbody>
                 {resolvedComplaints.length === 0 && (
-                  <tr><td colSpan="6" className="p-8 text-center text-gray-500">No resolved complaints yet</td></tr>
+                  <tr>
+                    <td colSpan="6" className="p-8 text-center text-gray-500">
+                      No resolved complaints yet
+                    </td>
+                  </tr>
                 )}
                 {resolvedComplaints.map((c) => {
                   const cid = c.id || c._id;
                   return (
-                    <tr key={cid} className="border-t border-white/5 hover:bg-white/5 transition">
-                      <td className="p-4 font-medium text-white">{c.translatedIssue || c.issueType}</td>
-                      <td className="p-4 text-gray-400">{c.translatedLocation || c.location}</td>
+                    <tr
+                      key={cid}
+                      className="border-t border-white/5 hover:bg-white/5 transition"
+                    >
+                      <td className="p-4 font-medium text-white">
+                        {c.translatedIssue || c.issueType}
+                      </td>
+                      <td className="p-4 text-gray-400">
+                        {c.translatedLocation || c.location}
+                      </td>
                       <td className="p-4">
-                        <span className={`text-xs px-2 py-0.5 rounded font-bold ${
-                          c.urgency?.toLowerCase() === "high" ? "bg-red-500/20 text-red-400" :
-                          c.urgency?.toLowerCase() === "medium" ? "bg-yellow-500/20 text-yellow-400" :
-                          "bg-green-500/20 text-green-400"
-                        }`}>{c.urgency}</span>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded font-bold ${
+                            c.urgency?.toLowerCase() === "high"
+                              ? "bg-red-500/20 text-red-400"
+                              : c.urgency?.toLowerCase() === "medium"
+                                ? "bg-yellow-500/20 text-yellow-400"
+                                : "bg-green-500/20 text-green-400"
+                          }`}
+                        >
+                          {c.urgency}
+                        </span>
                       </td>
                       <td className="p-4 text-gray-400 text-xs">
-                        {c.resolvedAt ? new Date(c.resolvedAt).toLocaleString() : "—"}
+                        {c.resolvedAt
+                          ? new Date(c.resolvedAt).toLocaleString()
+                          : "—"}
                       </td>
                       <td className="p-4 text-gray-400 text-xs">
                         {(() => {
-                          const officer = officers.find(o => o.officerId === c.assignedTo);
+                          const officer = officers.find(
+                            (o) => o.officerId === c.assignedTo,
+                          );
                           return officer ? (
                             <div>
-                              <p className="text-white text-xs font-medium">{officer.name}</p>
-                              <p className="text-gray-500 text-[10px]">{officer.department}</p>
+                              <p className="text-white text-xs font-medium">
+                                {officer.name}
+                              </p>
+                              <p className="text-gray-500 text-[10px]">
+                                {officer.department}
+                              </p>
                             </div>
-                          ) : (c.assignedTo || "—");
+                          ) : (
+                            c.assignedTo || "—"
+                          );
                         })()}
                       </td>
                       <td className="p-4">
@@ -440,12 +645,20 @@ function Dashboard() {
                             📷 View Proof
                           </a>
                         ) : (
-                          <span className="text-gray-600 text-xs">No photo</span>
+                          <span className="text-gray-600 text-xs">
+                            No photo
+                          </span>
                         )}
                       </td>
                       <td className="p-4">
                         <button
-                          onClick={() => confirmDelete("complaint", cid, c.translatedIssue || c.issueType)}
+                          onClick={() =>
+                            confirmDelete(
+                              "complaint",
+                              cid,
+                              c.translatedIssue || c.issueType,
+                            )
+                          }
                           className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1 rounded-lg hover:bg-red-500/30 transition font-medium"
                         >
                           Archive
@@ -464,7 +677,9 @@ function Dashboard() {
       {activeTab === "officers" && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-white font-semibold text-lg">Officer Management</h2>
+            <h2 className="text-white font-semibold text-lg">
+              Officer Management
+            </h2>
             <button
               onClick={fetchOfficers}
               className="text-sm bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition text-white"
@@ -484,7 +699,12 @@ function Dashboard() {
                   body: JSON.stringify(newOfficer),
                 });
                 if (res.ok) {
-                  setNewOfficer({ name: "", area: "", department: "PWD", phone: "" });
+                  setNewOfficer({
+                    name: "",
+                    area: "",
+                    department: "PWD",
+                    phone: "",
+                  });
                   fetchOfficers();
                   toast.success("Officer created!");
                 }
@@ -496,18 +716,37 @@ function Dashboard() {
           >
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-400">Name</label>
-              <input required value={newOfficer.name} onChange={(e) => setNewOfficer({ ...newOfficer, name: e.target.value })}
-                className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Officer Name" />
+              <input
+                required
+                value={newOfficer.name}
+                onChange={(e) =>
+                  setNewOfficer({ ...newOfficer, name: e.target.value })
+                }
+                className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                placeholder="Officer Name"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-400">Area</label>
-              <input required value={newOfficer.area} onChange={(e) => setNewOfficer({ ...newOfficer, area: e.target.value })}
-                className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Jurisdiction Area" />
+              <input
+                required
+                value={newOfficer.area}
+                onChange={(e) =>
+                  setNewOfficer({ ...newOfficer, area: e.target.value })
+                }
+                className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                placeholder="Jurisdiction Area"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-400">Department</label>
-              <select value={newOfficer.department} onChange={(e) => setNewOfficer({ ...newOfficer, department: e.target.value })}
-                className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+              <select
+                value={newOfficer.department}
+                onChange={(e) =>
+                  setNewOfficer({ ...newOfficer, department: e.target.value })
+                }
+                className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+              >
                 <option>PWD</option>
                 <option>Fire Department</option>
                 <option>Police</option>
@@ -531,10 +770,20 @@ function Dashboard() {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs text-gray-400">Phone</label>
-              <input required value={newOfficer.phone} onChange={(e) => setNewOfficer({ ...newOfficer, phone: e.target.value })}
-                className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500" placeholder="Phone Number" />
+              <input
+                required
+                value={newOfficer.phone}
+                onChange={(e) =>
+                  setNewOfficer({ ...newOfficer, phone: e.target.value })
+                }
+                className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+                placeholder="Phone Number"
+              />
             </div>
-            <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-4 py-2 rounded-lg transition">
+            <button
+              type="submit"
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-4 py-2 rounded-lg transition"
+            >
               Create
             </button>
           </form>
@@ -555,29 +804,51 @@ function Dashboard() {
               </thead>
               <tbody>
                 {officers.map((o) => (
-                  <tr key={o.officerId} className="border-b border-white/5 hover:bg-white/5">
+                  <tr
+                    key={o.officerId}
+                    className="border-b border-white/5 hover:bg-white/5"
+                  >
                     <td className="p-3 font-medium text-white">
                       {o.name}
-                      {o.phone && <span className="text-xs text-gray-400 font-normal ml-2">({o.phone})</span>}
+                      {o.phone && (
+                        <span className="text-xs text-gray-400 font-normal ml-2">
+                          ({o.phone})
+                        </span>
+                      )}
                     </td>
                     <td className="p-3">{o.department}</td>
                     <td className="p-3">{o.area}</td>
                     <td className="p-3">
-                      <span className="bg-slate-700 text-white px-2 py-0.5 rounded text-xs">{o.activeComplaintsCount}</span>
+                      <span className="bg-slate-700 text-white px-2 py-0.5 rounded text-xs">
+                        {o.activeComplaintsCount}
+                      </span>
                     </td>
                     <td className="p-3">
-                      {o.isAvailable
-                        ? <span className="text-green-400 bg-green-500/10 px-2 py-0.5 rounded text-xs">Available</span>
-                        : <span className="text-red-400 bg-red-500/10 px-2 py-0.5 rounded text-xs">Offline</span>}
+                      {o.isAvailable ? (
+                        <span className="text-green-400 bg-green-500/10 px-2 py-0.5 rounded text-xs">
+                          Available
+                        </span>
+                      ) : (
+                        <span className="text-red-400 bg-red-500/10 px-2 py-0.5 rounded text-xs">
+                          Offline
+                        </span>
+                      )}
                     </td>
                     <td className="p-3">
-                      <a href={`/officer/${o.officerId}`} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline text-xs">
+                      <a
+                        href={`/officer/${o.officerId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-cyan-400 hover:underline text-xs"
+                      >
                         Open ↗
                       </a>
                     </td>
                     <td className="p-3">
                       <button
-                        onClick={() => confirmDelete("officer", o.officerId, o.name)}
+                        onClick={() =>
+                          confirmDelete("officer", o.officerId, o.name)
+                        }
                         className="text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-3 py-1 rounded-lg hover:bg-red-500/30 transition font-medium"
                       >
                         Archive
@@ -586,7 +857,11 @@ function Dashboard() {
                   </tr>
                 ))}
                 {officers.length === 0 && (
-                  <tr><td colSpan="7" className="p-6 text-center text-gray-500">No officers found</td></tr>
+                  <tr>
+                    <td colSpan="7" className="p-6 text-center text-gray-500">
+                      No officers found
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
