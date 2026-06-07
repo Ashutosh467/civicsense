@@ -233,6 +233,19 @@ export const assignComplaintToOfficer = async (complaintId) => {
       if (best) return await assignToOfficer(complaint, best);
     }
 
+    // ─── LEVEL 2.5: Same dept + text match (when GPS unavailable) ───
+    console.log("→ Level 2.5: Same dept, text match fallback");
+    const level25 = deptOfficers.filter(o => {
+      const d = getDistance(o, complaintCoords);
+      if (d !== null) return false; // already checked in Level 2
+      return textAreaMatch(o.area, complaintLoc);
+    });
+    console.log(`   Level 2.5 candidates: ${level25.map(o => o.name).join(", ") || "none"}`);
+    if (level25.length > 0) {
+      const best = findBestOfficer(level25, complaintCoords, complaint);
+      if (best) return await assignToOfficer(complaint, best);
+    }
+
     // ─── LEVEL 3: Same dept + within 60km (LOW/MEDIUM only) ───
     if (!highUrgency) {
       console.log("→ Level 3: Same dept, within 60km");
