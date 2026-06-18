@@ -8,16 +8,13 @@ import toast from "react-hot-toast";
 import ComplaintTable from "../components/ComplaintTable";
 import OverviewCard from "../components/OverviewCard";
 const DEPARTMENTS = [
-  "PWD",
   "Fire Department",
   "Law & Order",
-  "Roads & Infrastructure",
+  "Health",
   "Water & Sanitation",
   "Electricity",
-  "Health",
+  "Roads & Infrastructure",
   "Municipal Services",
-  "Police",
-  "Other",
 ];
 
 function Dashboard() {
@@ -28,7 +25,7 @@ function Dashboard() {
   const [newOfficer, setNewOfficer] = useState({
     name: "",
     area: "",
-    department: "PWD",
+    department: "Fire Department",
     phone: "",
   });
   const [activeTab, setActiveTab] = useState("overview");
@@ -361,32 +358,11 @@ function Dashboard() {
                       className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-orange-500"
                     >
                       <option value="">Select Department</option>
-                      <option value="PWD">PWD</option>
-                      <option value="Fire Department">Fire Department</option>
-                      <option value="Law &amp; Order">Law &amp; Order</option>
-                      <option value="Roads &amp; Infrastructure">
-                        Roads &amp; Infrastructure
-                      </option>
-                      <option value="Water &amp; Sanitation">
-                        Water &amp; Sanitation
-                      </option>
-                      <option value="Electricity">Electricity</option>
-                      <option value="Health">Health</option>
-                      <option value="Municipal Services">
-                        Municipal Services
-                      </option>
-                      <option value="Water &amp; Sanitation">
-                        Water &amp; Sanitation
-                      </option>
-                      <option value="Electricity">Electricity</option>
-                      <option value="Health">Health</option>
-                      <option value="Law &amp; Order">Law &amp; Order</option>
-                      <option value="Municipal Services">
-                        Municipal Services
-                      </option>
-
-                      <option value="Police">Police</option>
-                      <option value="Other">Other</option>
+                      {DEPARTMENTS.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <button
@@ -702,7 +678,7 @@ function Dashboard() {
                   setNewOfficer({
                     name: "",
                     area: "",
-                    department: "PWD",
+                    department: "Fire Department",
                     phone: "",
                   });
                   fetchOfficers();
@@ -747,25 +723,11 @@ function Dashboard() {
                 }
                 className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
               >
-                <option>PWD</option>
-                <option>Fire Department</option>
-                <option>Police</option>
-                <option>Fire Department</option>
-                <option>Law & Order</option>
-                <option>Roads & Infrastructure</option>
-                <option>Water & Sanitation</option>
-                <option>Electricity</option>
-                <option>Health</option>
-                <option>Municipal Services</option>
-                <option>Water & Sanitation</option>
-                <option>Electricity</option>
-                <option>Health</option>
-                <option>Law & Order</option>
-                <option>Municipal Services</option>
-                <option>Water Board</option>
-                <option>Electricity</option>
-                <option>Health Department</option>
-                <option>Traffic Police</option>
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex flex-col gap-1">
