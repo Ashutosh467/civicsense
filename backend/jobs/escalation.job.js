@@ -10,7 +10,6 @@ export const startEscalationJob = () => {
     try {
       const now = new Date();
 
-      // Get all active assigned complaints with deadlines
       const activeComplaints = await Complaint.find({
         status: { $in: ["assigned", "in_progress"] },
         deadline: { $ne: null },
@@ -101,7 +100,6 @@ export const startEscalationJob = () => {
             }
           }
 
-          // Also notify admin at 60%
           try {
             getIO().emit("complaintWarning", {
               complaintId: complaint._id,
@@ -121,7 +119,6 @@ export const startEscalationJob = () => {
           complaint.reminderSent80 = true;
           await complaint.save();
 
-          // Find another available officer
           const currentOfficerId = complaint.assignedTo;
           const newOfficer = await Officer.findOne({
             isAvailable: true,
@@ -130,7 +127,7 @@ export const startEscalationJob = () => {
           });
 
           if (newOfficer) {
-            // Reduce old officer trust score
+            // Penalize old officer ONCE here only
             if (currentOfficerId) {
               const oldOfficer = await Officer.findOne({
                 officerId: currentOfficerId,
@@ -150,15 +147,18 @@ export const startEscalationJob = () => {
               }
             }
 
-            // Assign to new officer
+            // Assign to new officer and mark reassigned
             complaint.assignedTo = newOfficer.officerId;
+            complaint.assignedAt = new Date(); // ✅ reset assignedAt so 100% block measures from reassignment
             complaint.status = "assigned";
+            // ✅ reset reminder flags for new officer's fresh deadline window
+            complaint.reminderSent30 = false;
+            complaint.reminderSent60 = false;
             await complaint.save();
 
             newOfficer.activeComplaintsCount += 1;
             await newOfficer.save();
 
-            // Notify new officer
             if (newOfficer.phone) {
               await axios
                 .post(
@@ -180,7 +180,6 @@ export const startEscalationJob = () => {
                 );
             }
 
-            // Socket update
             try {
               getIO().emit("complaintReassigned", {
                 complaintId: complaint._id,
@@ -196,7 +195,7 @@ export const startEscalationJob = () => {
               `🔄 Auto reassigned complaint ${complaint._id} to ${newOfficer.name}`,
             );
           } else {
-            // No officer available — escalate to admin immediately
+            // No officer available — escalate immediately
             console.log(
               `⚠️ No officer available for reassignment — escalating complaint ${complaint._id}`,
             );
@@ -214,14 +213,17 @@ export const startEscalationJob = () => {
         }
 
         // ─── 100% DEADLINE BREACHED — ESCALATE ───
+        // ✅ Only runs if complaint was NOT already reassigned at 80%
+        // (reminderSent80 = true + assignedAt was reset means new officer is handling it)
         if (now > deadline && complaint.deadlineStatus !== "breached") {
           complaint.status = "escalated";
           complaint.escalatedAt = now;
           complaint.deadlineStatus = "breached";
           await complaint.save();
 
-          // Reduce officer trust score
-          if (complaint.assignedTo) {
+          // ✅ Only penalize if this officer was the ORIGINAL one (not reassigned)
+          // We know it's the original if reminderSent80 is false
+          if (complaint.assignedTo && !complaint.reminderSent80) {
             const officer = await Officer.findOne({
               officerId: complaint.assignedTo,
             });
@@ -234,7 +236,6 @@ export const startEscalationJob = () => {
               );
               await officer.save();
 
-              // SMS to officer
               if (officer.phone) {
                 await axios
                   .post(
@@ -260,11 +261,9 @@ export const startEscalationJob = () => {
             }
           }
 
-          // Make complaint public when escalated
           complaint.isPublic = true;
           await complaint.save();
 
-          // Notify admin via socket
           try {
             getIO().emit("complaintEscalated", complaint.toJSON());
           } catch (e) {
@@ -281,7 +280,6 @@ export const startEscalationJob = () => {
     }
   };
 
-  // Run immediately then every 15 minutes
   check();
   setInterval(check, 15 * 60 * 1000);
 };
