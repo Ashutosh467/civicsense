@@ -8,7 +8,8 @@ const axios = require("axios");
 const {
   sendComplaintReceivedSMS,
   sendComplaintResolvedSMS,
-  sendOfficerAssignedSMS
+  sendOfficerAssignedSMS,
+  checkBalance,
 } = require("./smsService");
 
 const { handleSMSReply } = require("./webhookHandler");
@@ -54,6 +55,16 @@ function validateTwilioRequest(req, res, next) {
  */
 app.get("/health", (req, res) => {
   res.send("Calling Service Running ✅");
+});
+
+app.get("/health/sms", async (req, res) => {
+  const result = await checkBalance();
+  const status = result.balance < 10 ? "low" : "ok";
+  res.json({
+    status,
+    balance: result.balance,
+    warning: result.balance < 10 ? "Fast2SMS balance is low — SMS may fail" : null,
+  });
 });
 
 /**
@@ -186,26 +197,46 @@ app.post("/sms/complaint-resolved", async (req, res) => {
   res.status(result.success ? 200 : 500).json(result);
 });
 
-app.post("/sms/officer-assigned", async (req, res) => {
-  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
-  const { officerPhone, officerName, issueType, location, officerId } = req.body;
-  if (!officerPhone || !officerName || !issueType || !location || !officerId) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-  const result = await sendOfficerAssignedSMS(officerPhone, officerName, issueType, location, officerId);
-  res.status(result.success ? 200 : 500).json(result);
-});
-
 app.post("/sms/officer-escalated", async (req, res) => {
   if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
     return res.status(403).json({ error: "Forbidden" });
   }
   const { officerPhone, officerName, issueType, location } = req.body;
-  const message = `CivicCall ESCALATION ALERT: Hi ${officerName}, complaint "${issueType}" at ${location} has been escalated to admin due to no action in 72 hours. Please resolve immediately.`;
-  const result = await sendSMS(officerPhone, message);
-  res.json(result);
+  const message = `CivicCall ESCALATION ALERT: Hi ${officerName}, complaint "${issueType}" at ${location} has been escalated to admin due to no action. Please resolve immediately.`;
+  try {
+    const result = await sendSMS(officerPhone, message);
+    res.status(200).json({ success: true, result });
+  } catch (err) {
+    console.error("❌ Escalation SMS failed:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/sms/officer-reminder", async (req, res) => {
+  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const {
+    officerPhone,
+    officerName,
+    issueType,
+    location,
+    hoursRemaining,
+    reminderType,
+  } = req.body;
+  let message;
+  if (reminderType === "30percent") {
+    message = `CivicCall Reminder: Hi ${officerName}, complaint ${issueType} at ${location} needs attention. ${hoursRemaining} hours remaining.`;
+  } else if (reminderType === "60percent") {
+    message = `CivicCall WARNING: Hi ${officerName}, complaint ${issueType} at ${location} is critical. Only ${hoursRemaining} hours left. Admin notified.`;
+  }
+  try {
+    const result = await sendSMS(officerPhone, message);
+    res.status(200).json({ success: true, result });
+  } catch (err) {
+    console.error("❌ Reminder SMS failed:", err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 /**

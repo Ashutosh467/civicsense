@@ -72,8 +72,22 @@ const sendOfficerAssignedSMS = async (officerPhone, officerName, issueType, loca
   }
 };
 
+const checkBalance = async () => {
+  try {
+    const response = await axios.get("https://www.fast2sms.com/dev/wallet", {
+      params: { authorization: process.env.FAST2SMS_API_KEY },
+    });
+    const balance = parseFloat(response.data?.wallet || 0);
+    return { success: true, balance };
+  } catch (err) {
+    console.error("❌ Balance check failed:", err.message);
+    return { success: false, balance: 0, error: err.message };
+  }
+};
+
 module.exports = {
   sendComplaintReceivedSMS,
   sendComplaintResolvedSMS,
   sendOfficerAssignedSMS,
+  checkBalance,
 };
