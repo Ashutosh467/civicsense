@@ -2,10 +2,15 @@ import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET || "civicsense_super_secret_key_123", {
-        expiresIn: "7d",
-    });
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET is not set in environment variables.");
+}
+
+const generateToken = (userId, role = "user") => {
+  return jwt.sign({ id: userId, role }, JWT_SECRET, {
+    expiresIn: "7d",
+  });
 };
 
 export const signup = async (req, res) => {
