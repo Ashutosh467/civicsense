@@ -125,6 +125,32 @@ app.post("/recording-complete", validateTwilioRequest, (req, res) => {
 
     activeRecordings.set(callSid, recordingData);
 
+    const spamCheck = await axios
+      .post(
+        `${process.env.MAIN_BACKEND_URL}/api/complaint/internal/spam-check`,
+        { phone: req.body.From },
+        { headers: { "x-internal-key": process.env.INTERNAL_SECRET } },
+      )
+      .then((r) => r.data)
+      .catch((err) => {
+        console.error("Spam check failed, allowing through:", err.message);
+        return { isSpam: false, blacklisted: false };
+      });
+
+    if (spamCheck.blacklisted) {
+      console.log("🚫 Blacklisted caller blocked:", req.body.From);
+      twiml.say("Your number has been restricted due to repeated false reports. Please contact support.");
+      res.type("text/xml");
+      return res.send(twiml.toString());
+    }
+
+    if (spamCheck.isSpam) {
+      console.log("🚫 Spam blocked (rate limit):", req.body.From);
+      twiml.say("You have reached the limit of complaints for this hour. Please try again later.");
+      res.type("text/xml");
+      return res.send(twiml.toString());
+    }
+
     axios
       .post(process.env.AI_MODULE_URL, recordingData)
       .then(() => console.log("🤖 Sent to AI"))
