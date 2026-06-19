@@ -1,31 +1,12 @@
-import axios from "axios";
-
 export const API = import.meta.env.VITE_API_URL || "http://localhost:10000";
 
-const apiClient = axios.create({
-  baseURL: API,
-});
-
-apiClient.interceptors.request.use((config) => {
+// Returns the Authorization header for whichever account is logged in
+// (admin or officer), or an empty object if neither token exists.
+// Spread this into any fetch() call's headers, e.g.:
+//   fetch(url, { headers: { ...authHeaders() } })
+export const authHeaders = () => {
   const adminToken = localStorage.getItem("civicsense_token");
   const officerToken = localStorage.getItem("officerToken");
   const token = adminToken || officerToken;
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  return config;
-});
-
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      console.warn("Auth token rejected by server:", error.response.data);
-    }
-    return Promise.reject(error);
-  },
-);
-
-export default apiClient;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
