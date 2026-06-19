@@ -1,14 +1,15 @@
 import Complaint from "../models/complaint.model.js";
 import Officer from "../models/officer.model.js";
 import { getIO } from "../sockets/socket.js";
+import { DEPARTMENTS } from "../constants/departments.js";
 import axios from "axios";
 
 const URGENCY_THRESHOLDS = {
   "Fire Department": 6,
   "Law & Order": 6,
-  "Health": 6,
+  Health: 6,
   "Water & Sanitation": 7,
-  "Electricity": 7,
+  Electricity: 7,
   "Roads & Infrastructure": 8,
   "Municipal Services": 9,
 };
@@ -27,15 +28,14 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
-async function geocodeLocation(locationText) {
+async function tryGeocode(query) {
   try {
-    const query = encodeURIComponent(locationText + ", Bihar, India");
     const response = await axios.get(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
       {
         headers: { "User-Agent": "CivicCall/1.0" },
         timeout: 5000,
-      }
+      },
     );
     if (response.data && response.data.length > 0) {
       const { lat, lon } = response.data[0];
@@ -43,9 +43,52 @@ async function geocodeLocation(locationText) {
     }
     return null;
   } catch (err) {
-    console.error("Geocoding failed:", err.message);
+    console.error(`Geocoding attempt failed for "${query}":`, err.message);
     return null;
   }
+}
+
+async function geocodeLocation(locationText) {
+  if (!locationText) return null;
+
+  // Strip common noise words that confuse Nominatim
+  const cleaned = locationText
+    .replace(/\b(near|behind|opposite|next to|in front of)\b/gi, "")
+    .trim();
+
+  // Build progressively simpler queries — most specific first
+  const attempts = [
+    `${cleaned}, Bihar, India`,
+    `${locationText}, Bihar, India`,
+  ];
+
+  // If the location has multiple comma-separated parts, try just the last 1-2 parts
+  // e.g. "Shop No 5, near Gandhi Maidan, Patna" -> "Patna, Bihar, India"
+  const parts = cleaned
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length > 1) {
+    attempts.push(`${parts[parts.length - 1]}, Bihar, India`);
+  }
+  if (parts.length > 2) {
+    attempts.push(
+      `${parts[parts.length - 2]}, ${parts[parts.length - 1]}, Bihar, India`,
+    );
+  }
+
+  for (const query of attempts) {
+    const result = await tryGeocode(query);
+    if (result) {
+      console.log(`📍 Geocoded successfully using: "${query}"`);
+      return result;
+    }
+  }
+
+  console.warn(
+    `⚠️ All geocoding attempts failed for: "${locationText}" — falling back to text match`,
+  );
+  return null;
 }
 
 function isHighUrgency(complaint) {
@@ -53,21 +96,15 @@ function isHighUrgency(complaint) {
   return (complaint.urgencyScore || 5) >= threshold;
 }
 
-// ================================
-// IMPROVED TEXT MATCHING
-// Checks if officer area matches complaint location
-// ================================
 function textAreaMatch(officerArea, complaintLocation) {
   if (!officerArea || !complaintLocation) return false;
-  
+
   const area = officerArea.toLowerCase().trim();
   const loc = complaintLocation.toLowerCase().trim();
-  
-  // Extract all keywords from both
-  const areaWords = area.split(/[\s,]+/).filter(w => w.length > 2);
-  const locWords = loc.split(/[\s,]+/).filter(w => w.length > 2);
-  
-  // Check if any word matches
+
+  const areaWords = area.split(/[\s,]+/).filter((w) => w.length > 2);
+  const locWords = loc.split(/[\s,]+/).filter((w) => w.length > 2);
+
   for (const word of areaWords) {
     if (locWords.includes(word)) return true;
     if (loc.includes(word)) return true;
@@ -75,7 +112,7 @@ function textAreaMatch(officerArea, complaintLocation) {
   for (const word of locWords) {
     if (area.includes(word)) return true;
   }
-  
+
   return false;
 }
 
@@ -84,12 +121,13 @@ function getDistance(officer, complaintCoords) {
     !complaintCoords ||
     !officer.currentLocation?.lat ||
     !officer.currentLocation?.lng
-  ) return null;
+  )
+    return null;
   return haversineDistance(
     complaintCoords.lat,
     complaintCoords.lng,
     officer.currentLocation.lat,
-    officer.currentLocation.lng
+    officer.currentLocation.lng,
   );
 }
 
@@ -104,10 +142,9 @@ function findBestOfficer(officers, complaintCoords, complaint) {
     if (distance !== null) {
       score += Math.max(0, 100 - distance * 2);
     } else {
-      // No GPS - use text match bonus
       const isMatch = textAreaMatch(
         officer.area,
-        complaint.translatedLocation || complaint.location
+        complaint.translatedLocation || complaint.location,
       );
       score += isMatch ? 60 : 20;
     }
@@ -120,7 +157,7 @@ function findBestOfficer(officers, complaintCoords, complaint) {
     if (!officer.currentLocation?.lat) score -= 10;
 
     console.log(
-      `Officer ${officer.name} (${officer.department}): score=${score.toFixed(0)}, distance=${distance ? distance.toFixed(1) + "km" : "no GPS"}, area=${officer.area}`
+      `Officer ${officer.name} (${officer.department}): score=${score.toFixed(0)}, distance=${distance ? distance.toFixed(1) + "km" : "no GPS"}, area=${officer.area}`,
     );
 
     if (score > bestScore) {
@@ -155,21 +192,29 @@ async function assignToOfficer(complaint, officer) {
   }
 
   if (officer.phone) {
-    axios.post(
-      `${process.env.TWILIO_SERVICE_URL}/sms/officer-assigned`,
-      {
-        officerPhone: officer.phone,
-        officerName: officer.name,
-        issueType: complaint.translatedIssue || complaint.issueType,
-        location: complaint.translatedLocation || complaint.location,
-        officerId: officer.officerId,
-      },
-      { headers: { "x-internal-key": process.env.INTERNAL_SECRET } }
-    ).catch(err => console.error("SMS error:", err.message));
+    axios
+      .post(
+        `${process.env.TWILIO_SERVICE_URL}/sms/officer-assigned`,
+        {
+          officerPhone: officer.phone,
+          officerName: officer.name,
+          issueType: complaint.translatedIssue || complaint.issueType,
+          location: complaint.translatedLocation || complaint.location,
+          officerId: officer.officerId,
+        },
+        { headers: { "x-internal-key": process.env.INTERNAL_SECRET } },
+      )
+      .catch((err) => console.error("SMS error:", err.message));
   }
 
-  console.log(`✅ Assigned complaint ${complaint._id} to ${officer.name} (${officer.department}, ${officer.area})`);
-  return { success: true, officerId: officer.officerId, officerName: officer.name };
+  console.log(
+    `✅ Assigned complaint ${complaint._id} to ${officer.name} (${officer.department}, ${officer.area})`,
+  );
+  return {
+    success: true,
+    officerId: officer.officerId,
+    officerName: officer.name,
+  };
 }
 
 export const assignComplaintToOfficer = async (complaintId) => {
@@ -177,19 +222,35 @@ export const assignComplaintToOfficer = async (complaintId) => {
     const complaint = await Complaint.findById(complaintId);
     if (!complaint) return { success: false, reason: "Complaint not found" };
 
-    if (["assigned", "in_progress", "resolved", "escalated"].includes(complaint.status)) {
+    if (
+      ["assigned", "in_progress", "resolved", "escalated"].includes(
+        complaint.status,
+      )
+    ) {
       return { success: false, reason: "Already assigned or escalated" };
+    }
+
+    // Normalize department — reject any value not in DEPARTMENTS
+    if (!DEPARTMENTS.includes(complaint.department)) {
+      console.warn(
+        `⚠️ Unknown department "${complaint.department}" — falling back to Municipal Services`,
+      );
+      complaint.department = "Municipal Services";
+      await complaint.save();
     }
 
     const highUrgency = isHighUrgency(complaint);
     const dept = complaint.department;
     const complaintLoc = complaint.translatedLocation || complaint.location;
 
-    console.log(`\n🔍 Assigning: "${dept}" at "${complaintLoc}" | High urgency: ${highUrgency}`);
+    console.log(
+      `\n🔍 Assigning: "${dept}" at "${complaintLoc}" | High urgency: ${highUrgency}`,
+    );
 
-    // Geocode complaint location
     const complaintCoords = await geocodeLocation(complaintLoc);
-    console.log(`📍 Coords: ${complaintCoords ? `${complaintCoords.lat}, ${complaintCoords.lng}` : "not found"}`);
+    console.log(
+      `📍 Coords: ${complaintCoords ? `${complaintCoords.lat}, ${complaintCoords.lng}` : "not found"}`,
+    );
 
     const allOfficers = await Officer.find({
       isAvailable: true,
@@ -201,21 +262,24 @@ export const assignComplaintToOfficer = async (complaintId) => {
       return { success: false, reason: "No officers available" };
     }
 
-    const deptOfficers = allOfficers.filter(o => o.department === dept);
-    const policeOfficers = allOfficers.filter(o =>
-      o.department === "Law & Order" || o.department === "Police"
+    // Use canonical "Law & Order" only — no "Police" alias
+    const deptOfficers = allOfficers.filter((o) => o.department === dept);
+    const policeOfficers = allOfficers.filter(
+      (o) => o.department === "Law & Order",
     );
 
     console.log(`Found ${deptOfficers.length} officers for ${dept}`);
 
     // ─── LEVEL 1: Same dept + same area (GPS 5km OR text match) ───
     console.log("→ Level 1: Same dept, same area");
-    const level1 = deptOfficers.filter(o => {
+    const level1 = deptOfficers.filter((o) => {
       const d = getDistance(o, complaintCoords);
       if (d !== null) return d <= 5;
       return textAreaMatch(o.area, complaintLoc);
     });
-    console.log(`   Level 1 candidates: ${level1.map(o => o.name).join(", ") || "none"}`);
+    console.log(
+      `   Level 1 candidates: ${level1.map((o) => o.name).join(", ") || "none"}`,
+    );
     if (level1.length > 0) {
       const best = findBestOfficer(level1, complaintCoords, complaint);
       if (best) return await assignToOfficer(complaint, best);
@@ -223,24 +287,28 @@ export const assignComplaintToOfficer = async (complaintId) => {
 
     // ─── LEVEL 2: Same dept + within 20km GPS ───
     console.log("→ Level 2: Same dept, within 20km GPS");
-    const level2 = deptOfficers.filter(o => {
+    const level2 = deptOfficers.filter((o) => {
       const d = getDistance(o, complaintCoords);
       return d !== null && d <= 20;
     });
-    console.log(`   Level 2 candidates: ${level2.map(o => o.name).join(", ") || "none"}`);
+    console.log(
+      `   Level 2 candidates: ${level2.map((o) => o.name).join(", ") || "none"}`,
+    );
     if (level2.length > 0) {
       const best = findBestOfficer(level2, complaintCoords, complaint);
       if (best) return await assignToOfficer(complaint, best);
     }
 
-    // ─── LEVEL 2.5: Same dept + text match (when GPS unavailable) ───
+    // ─── LEVEL 2.5: Same dept + text match (no GPS) ───
     console.log("→ Level 2.5: Same dept, text match fallback");
-    const level25 = deptOfficers.filter(o => {
+    const level25 = deptOfficers.filter((o) => {
       const d = getDistance(o, complaintCoords);
-      if (d !== null) return false; // already checked in Level 2
+      if (d !== null) return false;
       return textAreaMatch(o.area, complaintLoc);
     });
-    console.log(`   Level 2.5 candidates: ${level25.map(o => o.name).join(", ") || "none"}`);
+    console.log(
+      `   Level 2.5 candidates: ${level25.map((o) => o.name).join(", ") || "none"}`,
+    );
     if (level25.length > 0) {
       const best = findBestOfficer(level25, complaintCoords, complaint);
       if (best) return await assignToOfficer(complaint, best);
@@ -249,7 +317,7 @@ export const assignComplaintToOfficer = async (complaintId) => {
     // ─── LEVEL 3: Same dept + within 60km (LOW/MEDIUM only) ───
     if (!highUrgency) {
       console.log("→ Level 3: Same dept, within 60km");
-      const level3GPS = deptOfficers.filter(o => {
+      const level3GPS = deptOfficers.filter((o) => {
         const d = getDistance(o, complaintCoords);
         return d !== null && d <= 60;
       });
@@ -257,9 +325,10 @@ export const assignComplaintToOfficer = async (complaintId) => {
         const best = findBestOfficer(level3GPS, complaintCoords, complaint);
         if (best) return await assignToOfficer(complaint, best);
       }
-      // No GPS officers at level 3
-      const level3NoGPS = deptOfficers.filter(o => !o.currentLocation?.lat);
-      console.log(`   Level 3 no-GPS candidates: ${level3NoGPS.map(o => o.name).join(", ") || "none"}`);
+      const level3NoGPS = deptOfficers.filter((o) => !o.currentLocation?.lat);
+      console.log(
+        `   Level 3 no-GPS candidates: ${level3NoGPS.map((o) => o.name).join(", ") || "none"}`,
+      );
       if (level3NoGPS.length > 0) {
         const best = findBestOfficer(level3NoGPS, complaintCoords, complaint);
         if (best) return await assignToOfficer(complaint, best);
@@ -268,14 +337,16 @@ export const assignComplaintToOfficer = async (complaintId) => {
       console.log("→ Level 3: SKIPPED (high urgency)");
     }
 
-    // ─── LEVEL 4: Police officer same area ───
-    console.log("→ Level 4: Police fallback");
-    const level4 = policeOfficers.filter(o => {
+    // ─── LEVEL 4: Law & Order officer same area ───
+    console.log("→ Level 4: Law & Order fallback");
+    const level4 = policeOfficers.filter((o) => {
       const d = getDistance(o, complaintCoords);
       if (d !== null) return d <= 10;
       return textAreaMatch(o.area, complaintLoc);
     });
-    console.log(`   Level 4 candidates: ${level4.map(o => o.name).join(", ") || "none"}`);
+    console.log(
+      `   Level 4 candidates: ${level4.map((o) => o.name).join(", ") || "none"}`,
+    );
     if (level4.length > 0) {
       const best = findBestOfficer(level4, complaintCoords, complaint);
       if (best) return await assignToOfficer(complaint, best);
@@ -300,9 +371,11 @@ export const assignComplaintToOfficer = async (complaintId) => {
     }
 
     return { success: false, reason: "No officer available - admin alerted" };
-
   } catch (error) {
     console.error("Auto assign error:", error.message);
     return { success: false, reason: error.message };
   }
 };
+
+// Export DEPARTMENTS for use in frontend API route
+export { DEPARTMENTS };
