@@ -7,6 +7,10 @@ import { socket } from "../services/socket";
 import toast from "react-hot-toast";
 import ComplaintTable from "../components/ComplaintTable";
 import OverviewCard from "../components/OverviewCard";
+const authHeaders = () => {
+  const token = localStorage.getItem("civicsense_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 const DEPARTMENTS = [
   "Fire Department",
   "Law & Order",
@@ -39,7 +43,9 @@ function Dashboard() {
 
   const fetchOfficers = async () => {
     try {
-      const res = await fetch(`${API}/api/officer`);
+      const res = await fetch(`${API}/api/officer`, {
+        headers: { ...authHeaders() },
+      });
       const data = await res.json();
       setOfficers(
         Array.isArray(data)
@@ -55,7 +61,9 @@ function Dashboard() {
 
   const fetchPendingOfficers = async () => {
     try {
-      const res = await fetch(`${API}/api/officer/auth/pending`);
+      const res = await fetch(`${API}/api/officer/auth/pending`, {
+        headers: { ...authHeaders() },
+      });
       const data = await res.json();
       setPendingOfficers(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -67,7 +75,7 @@ function Dashboard() {
     try {
       const res = await fetch(`${API}/api/officer/${officerId}/approve`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ action, area, department }),
       });
       if (res.ok) {
@@ -197,7 +205,10 @@ function Dashboard() {
         type === "complaint"
           ? `${API}/api/complaint/${id}/archive`
           : `${API}/api/officer/${id}/archive`;
-      const res = await fetch(url, { method: "PATCH" });
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { ...authHeaders() },
+      });
       if (res.ok) {
         toast.success(
           `${type === "complaint" ? "Complaint" : "Officer"} archived successfully`,
@@ -671,7 +682,10 @@ function Dashboard() {
               try {
                 const res = await fetch(`${API}/api/officer`, {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...authHeaders(),
+                  },
                   body: JSON.stringify(newOfficer),
                 });
                 if (res.ok) {
