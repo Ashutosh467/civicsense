@@ -1,11 +1,16 @@
 import mongoose from "mongoose";
+import { DEPARTMENTS } from "../constants/departments.js";
 
 const officerSchema = new mongoose.Schema({
   // Basic Info
   officerId: { type: String, unique: true, required: true },
   name: { type: String, required: true },
   area: { type: String, default: "" },
-  department: { type: String, default: "General" },
+  department: {
+    type: String,
+    enum: DEPARTMENTS,
+    default: "Municipal Services",
+  },
   phone: { type: String, default: "" },
   email: { type: String, default: "", sparse: true },
   password: { type: String, default: "" },
@@ -22,14 +27,13 @@ const officerSchema = new mongoose.Schema({
     lng: { type: Number, default: null },
   },
   lastSeen: { type: Date, default: Date.now },
-
-  // ✅ NEW — Officer Performance
-  trustScore: { type: Number, default: 70 }, // 0-100 reliability
-  totalResolved: { type: Number, default: 0 }, // total resolved
-  totalFake: { type: Number, default: 0 }, // times nothing found
-  totalEscalated: { type: Number, default: 0 }, // times escalated
-  averageResolutionHours: { type: Number, default: 0 }, // avg time to resolve
-  warningCount: { type: Number, default: 0 }, // warnings received
+  // Officer Performance
+  trustScore: { type: Number, default: 70 },
+  totalResolved: { type: Number, default: 0 },
+  totalFake: { type: Number, default: 0 },
+  totalEscalated: { type: Number, default: 0 },
+  averageResolutionHours: { type: Number, default: 0 },
+  warningCount: { type: Number, default: 0 },
 });
 
 officerSchema.virtual("id").get(function () {
