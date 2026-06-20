@@ -59,7 +59,9 @@ export default function OfficerLogin() {
 
       <div className="w-full max-w-md bg-white/5 border border-white/10 backdrop-blur-xl p-8 rounded-3xl shadow-2xl relative z-10">
         <div className="flex justify-center mb-6">
-          <Link to="/"><ShieldCheck className="w-10 h-10 text-orange-400" /></Link>
+          <Link to="/">
+            <ShieldCheck className="w-10 h-10 text-orange-400" />
+          </Link>
         </div>
 
         <div className="flex justify-center mb-6">
@@ -73,14 +75,18 @@ export default function OfficerLogin() {
           {isSignup ? "Officer Signup" : "Officer Login"}
         </h2>
         <p className="text-gray-400 text-center text-sm mb-8">
-          {isSignup ? "Register your field account — admin will approve" : "Access your personal field dashboard"}
+          {isSignup
+            ? "Register your field account — admin will approve"
+            : "Access your personal field dashboard"}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {isSignup && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Full Name</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Full Name
+                </label>
                 <input
                   type="text"
                   required
@@ -91,7 +97,9 @@ export default function OfficerLogin() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Phone Number</label>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Phone Number
+                </label>
                 <input
                   type="tel"
                   placeholder="Mobile Number (10 digits)"
@@ -104,7 +112,9 @@ export default function OfficerLogin() {
             </>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              Email
+            </label>
             <input
               type="email"
               required
@@ -115,7 +125,9 @@ export default function OfficerLogin() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+              Password
+            </label>
             <input
               type="password"
               required
@@ -130,22 +142,39 @@ export default function OfficerLogin() {
             disabled={isSubmitting}
             className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 mt-4"
           >
-            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : isSignup ? "Register Account" : "Access My Dashboard"}
+            {isSubmitting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : isSignup ? (
+              "Register Account"
+            ) : (
+              "Access My Dashboard"
+            )}
           </button>
         </form>
 
         <div className="mt-6 text-center">
           <button
-            onClick={() => { setIsSignup(!isSignup); setName(""); setPhone(""); setEmail(""); setPassword(""); }}
+            onClick={() => {
+              setIsSignup(!isSignup);
+              setName("");
+              setPhone("");
+              setEmail("");
+              setPassword("");
+            }}
             className="text-orange-400 hover:text-orange-300 text-sm font-medium transition"
           >
-            {isSignup ? "Already registered? Login →" : "New officer? Sign up →"}
+            {isSignup
+              ? "Already registered? Login →"
+              : "New officer? Sign up →"}
           </button>
         </div>
 
         <div className="mt-6 pt-6 border-t border-white/10 text-center">
           <p className="text-gray-500 text-xs mb-1">Are you an admin?</p>
-          <Link to="/login" className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition">
+          <Link
+            to="/login"
+            className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition"
+          >
             Go to Admin Login →
           </Link>
         </div>
