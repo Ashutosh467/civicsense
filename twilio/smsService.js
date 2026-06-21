@@ -1,12 +1,11 @@
 const axios = require("axios");
-
 const formatIndianNumber = (number) => {
   const cleaned = number.replace(/\D/g, "");
-  if (cleaned.startsWith("91") && cleaned.length === 12) return cleaned.slice(2);
+  if (cleaned.startsWith("91") && cleaned.length === 12)
+    return cleaned.slice(2);
   if (cleaned.length === 10) return cleaned;
   return cleaned;
 };
-
 const sendSMS = async (toNumber, message) => {
   const number = formatIndianNumber(toNumber);
   try {
@@ -25,16 +24,17 @@ const sendSMS = async (toNumber, message) => {
       // The request was made and the server responded with a status code
       // that falls out of the range of 2xx
       console.error("Fast2SMS API Error Response:", axiosError.response.data);
-      throw new Error(axiosError.response.data.message || JSON.stringify(axiosError.response.data));
+      throw new Error(
+        axiosError.response.data.message ||
+          JSON.stringify(axiosError.response.data),
+      );
     } else {
       console.error("Fast2SMS Request Error:", axiosError.message);
       throw axiosError;
     }
   }
 };
-
 const getShortId = (id) => String(id).slice(-6).toUpperCase();
-
 const sendComplaintReceivedSMS = async (toNumber, complaintId) => {
   try {
     const message = `CivicCall: Your complaint has been received. Tracking ID: #CS${getShortId(complaintId)}. We will resolve it within 24 hours. Thank you.`;
@@ -46,7 +46,6 @@ const sendComplaintReceivedSMS = async (toNumber, complaintId) => {
     return { success: false, error: err.message };
   }
 };
-
 const sendComplaintResolvedSMS = async (toNumber, complaintId) => {
   try {
     const message = `CivicCall: Your complaint #CS${getShortId(complaintId)} has been resolved by our field officer. Was your issue fixed? Reply YES to confirm or NO to reopen.`;
@@ -58,8 +57,13 @@ const sendComplaintResolvedSMS = async (toNumber, complaintId) => {
     return { success: false, error: err.message };
   }
 };
-
-const sendOfficerAssignedSMS = async (officerPhone, officerName, issueType, location, officerId) => {
+const sendOfficerAssignedSMS = async (
+  officerPhone,
+  officerName,
+  issueType,
+  location,
+  officerId,
+) => {
   try {
     const dashboardLink = `${process.env.MAIN_BACKEND_URL}/officer/${officerId}`;
     const message = `CivicCall Alert: Hi ${officerName}, new complaint assigned. Issue: ${issueType} at ${location}. Open: ${dashboardLink}`;
@@ -71,7 +75,17 @@ const sendOfficerAssignedSMS = async (officerPhone, officerName, issueType, loca
     return { success: false, error: err.message };
   }
 };
-
+const sendOfficerInviteSMS = async (officerPhone, officerName, inviteLink) => {
+  try {
+    const message = `CivicCall: Hi ${officerName}, you've been added as a field officer. Set up your login here: ${inviteLink} (link expires in 72 hours)`;
+    const result = await sendSMS(officerPhone, message);
+    console.log("✅ Officer invite SMS sent to", officerPhone, result);
+    return { success: true };
+  } catch (err) {
+    console.error("❌ Officer invite SMS failed:", err.message);
+    return { success: false, error: err.message };
+  }
+};
 const checkBalance = async () => {
   try {
     const response = await axios.get("https://www.fast2sms.com/dev/wallet", {
@@ -84,10 +98,10 @@ const checkBalance = async () => {
     return { success: false, balance: 0, error: err.message };
   }
 };
-
 module.exports = {
   sendComplaintReceivedSMS,
   sendComplaintResolvedSMS,
   sendOfficerAssignedSMS,
+  sendOfficerInviteSMS,
   checkBalance,
 };

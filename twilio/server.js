@@ -9,6 +9,7 @@ const {
   sendComplaintReceivedSMS,
   sendComplaintResolvedSMS,
   sendOfficerAssignedSMS,
+  sendOfficerInviteSMS,
   checkBalance,
 } = require("./smsService");
 
@@ -63,7 +64,8 @@ app.get("/health/sms", async (req, res) => {
   res.json({
     status,
     balance: result.balance,
-    warning: result.balance < 10 ? "Fast2SMS balance is low — SMS may fail" : null,
+    warning:
+      result.balance < 10 ? "Fast2SMS balance is low — SMS may fail" : null,
   });
 });
 
@@ -101,7 +103,7 @@ app.post("/voice", validateTwilioRequest, (req, res) => {
 /**
  * RECORDING COMPLETE (SECURED)
  */
-app.post("/recording-complete", validateTwilioRequest, (req, res) => {
+app.post("/recording-complete", validateTwilioRequest, async (req, res) => {
   const VoiceResponse = twilio.twiml.VoiceResponse;
   const twiml = new VoiceResponse();
 
@@ -139,14 +141,18 @@ app.post("/recording-complete", validateTwilioRequest, (req, res) => {
 
     if (spamCheck.blacklisted) {
       console.log("🚫 Blacklisted caller blocked:", req.body.From);
-      twiml.say("Your number has been restricted due to repeated false reports. Please contact support.");
+      twiml.say(
+        "Your number has been restricted due to repeated false reports. Please contact support.",
+      );
       res.type("text/xml");
       return res.send(twiml.toString());
     }
 
     if (spamCheck.isSpam) {
       console.log("🚫 Spam blocked (rate limit):", req.body.From);
-      twiml.say("You have reached the limit of complaints for this hour. Please try again later.");
+      twiml.say(
+        "You have reached the limit of complaints for this hour. Please try again later.",
+      );
       res.type("text/xml");
       return res.send(twiml.toString());
     }
@@ -265,6 +271,24 @@ app.post("/sms/officer-reminder", async (req, res) => {
   }
 });
 
+app.post("/sms/officer-invite", async (req, res) => {
+  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { officerPhone, officerName, inviteLink } = req.body;
+  if (!officerPhone || !officerName || !inviteLink) {
+    return res
+      .status(400)
+      .json({ error: "Missing officerPhone, officerName, or inviteLink" });
+  }
+  const result = await sendOfficerInviteSMS(
+    officerPhone,
+    officerName,
+    inviteLink,
+  );
+  res.status(result.success ? 200 : 500).json(result);
+});
+
 /**
  * SMS WEBHOOK
  */
@@ -273,12 +297,37 @@ app.post("/sms/officer-reminder", async (req, res) => {
   if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
     return res.status(403).json({ error: "Forbidden" });
   }
-  const { officerPhone, officerName, issueType, location, hoursRemaining, reminderType } = req.body;
+  const {
+    officerPhone,
+    officerName,
+    issueType,
+    location,
+    hoursRemaining,
+    reminderType,
+  } = req.body;
   let message;
   if (reminderType === "30percent") {
-    message = "CivicCall Reminder: Hi " + officerName + ", complaint " + issueType + " at " + location + " needs attention. " + hoursRemaining + " hours remaining.";
+    message =
+      "CivicCall Reminder: Hi " +
+      officerName +
+      ", complaint " +
+      issueType +
+      " at " +
+      location +
+      " needs attention. " +
+      hoursRemaining +
+      " hours remaining.";
   } else if (reminderType === "60percent") {
-    message = "CivicCall WARNING: Hi " + officerName + ", complaint " + issueType + " at " + location + " is critical. Only " + hoursRemaining + " hours left. Admin notified.";
+    message =
+      "CivicCall WARNING: Hi " +
+      officerName +
+      ", complaint " +
+      issueType +
+      " at " +
+      location +
+      " is critical. Only " +
+      hoursRemaining +
+      " hours left. Admin notified.";
   }
   const result = await sendSMS(officerPhone, message);
   res.json(result);
