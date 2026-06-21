@@ -146,8 +146,12 @@ export const startEscalationJob = () => {
                 await oldOfficer.save();
               }
             }
-
             // Assign to new officer and mark reassigned
+            // ✅ Record who originally had this, but only the FIRST time it's
+            // ever escalated — if reassigned again later, keep the original culprit.
+            if (!complaint.escalatedFromOfficer) {
+              complaint.escalatedFromOfficer = currentOfficerId;
+            }
             complaint.assignedTo = newOfficer.officerId;
             complaint.assignedAt = new Date(); // ✅ reset assignedAt so 100% block measures from reassignment
             complaint.status = "assigned";

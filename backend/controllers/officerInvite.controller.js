@@ -166,3 +166,56 @@ export const acceptOfficerInvite = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+/**
+ * ADMIN ONLY.
+ * Officer roster report — every officer who has gone through the invite
+ * system, with their invite-sent and setup-completed timestamps.
+ * "Date joined" = when they completed setup, not when the invite was sent.
+ * Officers created via the old direct-create flow (no invite record)
+ * will show blank/N/A for these timestamps.
+ */
+export const getOfficerRosterReport = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    const officerFilter = {};
+    if (from || to) {
+      officerFilter.createdAt = {};
+      if (from) officerFilter.createdAt.$gte = new Date(from);
+      if (to) {
+        const toEnd = new Date(to);
+        toEnd.setHours(23, 59, 59, 999);
+        officerFilter.createdAt.$lte = toEnd;
+      }
+    }
+
+    const officers = await Officer.find(officerFilter).sort({ createdAt: -1 });
+
+    // Match each officer back to the invite that created them, if any
+    const officerIds = officers.map((o) => o.officerId);
+    const invites = await OfficerInvite.find({
+      usedByOfficerId: { $in: officerIds },
+    });
+    const inviteByOfficerId = {};
+    invites.forEach((inv) => {
+      inviteByOfficerId[inv.usedByOfficerId] = inv;
+    });
+
+    const roster = officers.map((o) => {
+      const invite = inviteByOfficerId[o.officerId];
+      return {
+        officerId: o.officerId,
+        name: o.name,
+        phone: o.phone,
+        inviteSentAt: invite ? invite.createdAt : null,
+        setupCompletedAt: invite ? invite.updatedAt : null,
+        dateJoined: invite ? invite.updatedAt : null,
+      };
+    });
+
+    res.json(roster);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
