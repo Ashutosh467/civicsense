@@ -11,6 +11,7 @@ import LocationMap from "./pages/LocationMap";
 import OfficerDashboard from "./pages/OfficerDashboard";
 import OfficerLogin from "./pages/OfficerLogin";
 import OfficerSetup from "./pages/OfficerSetup";
+import AdminSetup from "./pages/AdminSetup";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from "react-hot-toast";
@@ -37,6 +38,7 @@ function App() {
             <Route path="/officer/:officerId?" element={<OfficerDashboard />} />
             <Route path="/officer-login" element={<OfficerLogin />} />
             <Route path="/officer-setup" element={<OfficerSetup />} />
+            <Route path="/admin-setup" element={<AdminSetup />} />
 
             {/* Protected Dashboard */}
             <Route
