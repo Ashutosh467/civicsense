@@ -110,6 +110,12 @@ export const protectAdmin = async (req, res, next) => {
         .json({ error: "Forbidden. Admin access required." });
     }
 
+    if (user.isActive === false) {
+      return res
+        .status(403)
+        .json({ error: "This account has been deactivated." });
+    }
+
     req.admin = user;
     next();
   } catch (error) {
@@ -152,6 +158,12 @@ export const protectSuperAdmin = async (req, res, next) => {
       return res
         .status(403)
         .json({ error: "Forbidden. Super Admin access required." });
+    }
+
+    if (user.isActive === false) {
+      return res
+        .status(403)
+        .json({ error: "This account has been deactivated." });
     }
 
     req.admin = user;
