@@ -69,7 +69,17 @@ export const createOfficerInvite = async (req, res) => {
 
 export const getOfficerInvites = async (req, res) => {
   try {
-    const invites = await OfficerInvite.find().sort({ createdAt: -1 });
+    const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
+
+    // Show: invites never used, OR invites used within the last 12 hours.
+    // Older used invites stay in the database but drop out of this view.
+    const invites = await OfficerInvite.find({
+      $or: [
+        { used: false },
+        { used: true, updatedAt: { $gte: twelveHoursAgo } },
+      ],
+    }).sort({ createdAt: -1 });
+
     res.json(invites);
   } catch (error) {
     res.status(500).json({ error: error.message });

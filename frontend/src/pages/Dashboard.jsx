@@ -25,6 +25,7 @@ function Dashboard() {
   const [complaints, setComplaints] = useState([]);
   const [officers, setOfficers] = useState([]);
   const [pendingOfficers, setPendingOfficers] = useState([]);
+  const [officerInvites, setOfficerInvites] = useState([]);
   const [isOfficersExpanded, setIsOfficersExpanded] = useState(false);
   const [newOfficer, setNewOfficer] = useState({
     name: "",
@@ -70,6 +71,17 @@ function Dashboard() {
       console.error("Failed to fetch pending officers", err);
     }
   };
+  const fetchOfficerInvites = async () => {
+    try {
+      const res = await fetch(`${API}/api/officer-invite/`, {
+        headers: { ...authHeaders() },
+      });
+      const data = await res.json();
+      setOfficerInvites(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to fetch officer invites", err);
+    }
+  };
 
   const handleOfficerApproval = async (officerId, action, area, department) => {
     try {
@@ -91,6 +103,7 @@ function Dashboard() {
   useEffect(() => {
     fetchOfficers();
     fetchPendingOfficers();
+    fetchOfficerInvites();
   }, []);
 
   useEffect(() => {
@@ -696,6 +709,7 @@ function Dashboard() {
                     department: "Fire Department",
                     phone: "",
                   });
+                  fetchOfficerInvites();
                   if (data.smsSent) {
                     toast.success(
                       `Invite sent to ${newOfficer.phone} via SMS!`,
@@ -772,6 +786,60 @@ function Dashboard() {
               Create
             </button>
           </form>
+          {/* Pending Officer Invites */}
+          {officerInvites.length > 0 && (
+            <div className="bg-[#1E293B] rounded-xl border border-white/5 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/5">
+                <h3 className="text-white font-semibold text-sm">
+                  Officer Invites
+                </h3>
+                <p className="text-gray-500 text-xs mt-0.5">
+                  Sent invites and their setup status. Completed invites
+                  disappear from this list 12 hours after setup.
+                </p>
+              </div>
+              <table className="w-full text-left text-sm text-gray-300">
+                <thead className="bg-[#0F172A] text-gray-400 uppercase text-xs">
+                  <tr>
+                    <th className="p-3">Name</th>
+                    <th className="p-3">Sent At</th>
+                    <th className="p-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {officerInvites.map((inv) => (
+                    <tr
+                      key={inv._id}
+                      className="border-t border-white/5 hover:bg-white/5"
+                    >
+                      <td className="p-3 font-medium text-white">{inv.name}</td>
+                      <td className="p-3 text-gray-400 text-xs">
+                        {inv.createdAt
+                          ? new Date(inv.createdAt).toLocaleString()
+                          : "—"}
+                      </td>
+                      <td className="p-3">
+                        {inv.used ? (
+                          <span className="text-green-400 bg-green-500/10 border border-green-500/30 px-2 py-0.5 rounded text-xs">
+                            ✓ Setup complete{" "}
+                            {inv.updatedAt
+                              ? `at ${new Date(inv.updatedAt).toLocaleString()}`
+                              : ""}
+                          </span>
+                        ) : (
+                          <span className="text-orange-400 bg-orange-500/10 border border-orange-500/30 px-2 py-0.5 rounded text-xs">
+                            ⏳ Pending — not yet set up
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Officers Table */}
 
           {/* Officers Table */}
           <div className="bg-[#111827] rounded-xl border border-white/10 overflow-hidden">
