@@ -10,6 +10,7 @@ import Settings from "./pages/Settings";
 import LocationMap from "./pages/LocationMap";
 import OfficerDashboard from "./pages/OfficerDashboard";
 import OfficerLogin from "./pages/OfficerLogin";
+import OfficerSetup from "./pages/OfficerSetup";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from "react-hot-toast";
@@ -23,10 +24,10 @@ function App() {
             position="top-center"
             toastOptions={{
               style: {
-                background: '#1F2937',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.1)'
-              }
+                background: "#1F2937",
+                color: "#fff",
+                border: "1px solid rgba(255,255,255,0.1)",
+              },
             }}
           />
           <Routes>
@@ -35,47 +36,63 @@ function App() {
             <Route path="/signup" element={<Signup />} />
             <Route path="/officer/:officerId?" element={<OfficerDashboard />} />
             <Route path="/officer-login" element={<OfficerLogin />} />
+            <Route path="/officer-setup" element={<OfficerSetup />} />
 
             {/* Protected Dashboard */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Dashboard />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Dashboard />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/map" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <MapPage />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/map"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <MapPage />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/location-map" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <LocationMap />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/location-map"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <LocationMap />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/reports" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Reports />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Reports />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <Settings />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <MainLayout>
+                    <Settings />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

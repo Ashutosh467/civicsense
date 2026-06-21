@@ -680,7 +680,7 @@ function Dashboard() {
             onSubmit={async (e) => {
               e.preventDefault();
               try {
-                const res = await fetch(`${API}/api/officer`, {
+                const res = await fetch(`${API}/api/officer-invite`, {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
@@ -688,6 +688,7 @@ function Dashboard() {
                   },
                   body: JSON.stringify(newOfficer),
                 });
+                const data = await res.json();
                 if (res.ok) {
                   setNewOfficer({
                     name: "",
@@ -695,11 +696,19 @@ function Dashboard() {
                     department: "Fire Department",
                     phone: "",
                   });
-                  fetchOfficers();
-                  toast.success("Officer created!");
+                  if (data.smsSent) {
+                    toast.success(
+                      `Invite sent to ${newOfficer.phone} via SMS!`,
+                    );
+                  } else {
+                    toast.success(`Invite created! Link: ${data.inviteLink}`);
+                  }
+                } else {
+                  toast.error(data.error || "Failed to create invite");
                 }
               } catch (err) {
                 console.error(err);
+                toast.error("Network error creating invite");
               }
             }}
             className="flex flex-wrap gap-4 items-end bg-[#1E293B] p-4 rounded-xl border border-white/5"
