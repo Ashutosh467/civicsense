@@ -2,6 +2,7 @@ import AdminInvite from "../models/adminInvite.model.js";
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { sendAdminInviteEmail } from "../services/emailService.js";
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not set in environment variables.");
@@ -14,21 +15,46 @@ const INVITE_VALID_HOURS = 72; // invite link expires after 3 days
  */
 export const createInvite = async (req, res) => {
   try {
-    const { label, invitedName } = req.body;
+    const { label, invitedName, email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ error: "Email is required to send the invite." });
+    }
+
     const expiresAt = new Date(
       Date.now() + INVITE_VALID_HOURS * 60 * 60 * 1000,
     );
     const invite = await AdminInvite.create({
       label: label || "",
       invitedName: invitedName || "",
+      invitedEmail: email,
       createdBy: req.admin.id,
       expiresAt,
     });
+
+    const inviteLink = `${process.env.FRONTEND_URL}/admin-setup?token=${invite.token}`;
+
+    let emailSent = false;
+    try {
+      await sendAdminInviteEmail(email, invitedName || "there", inviteLink);
+      emailSent = true;
+    } catch (emailErr) {
+      console.error("Admin invite email failed:", emailErr.message);
+      // Fail open: the invite still exists and the link is returned below,
+      // so the Super Admin can send it manually if the email didn't go out.
+    }
+
     res.status(201).json({
-      message: "Invite created",
+      message: emailSent
+        ? "Invite created and emailed"
+        : "Invite created, but email failed to send",
       token: invite.token,
+      inviteLink,
       label: invite.label,
       expiresAt: invite.expiresAt,
+      emailSent,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

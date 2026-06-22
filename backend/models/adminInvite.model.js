@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import crypto from "crypto";
-
 const adminInviteSchema = new mongoose.Schema(
   {
     token: {
@@ -14,6 +13,10 @@ const adminInviteSchema = new mongoose.Schema(
       default: "",
     },
     invitedName: {
+      type: String,
+      default: "",
+    },
+    invitedEmail: {
       type: String,
       default: "",
     },
@@ -43,6 +46,5 @@ const adminInviteSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
-
 const AdminInvite = mongoose.model("AdminInvite", adminInviteSchema);
 export default AdminInvite;
