@@ -1,47 +1,35 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-let transporter = null;
+let resendClient = null;
 
-const getTransporter = () => {
-  if (transporter) return transporter;
+const getClient = () => {
+  if (resendClient) return resendClient;
 
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    throw new Error(
-      "GMAIL_USER or GMAIL_APP_PASSWORD is not set in environment variables.",
-    );
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY is not set in environment variables.");
   }
 
-  transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true, // true for port 465, false for 587
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-    connectionTimeout: 10000, // 10s - fail fast instead of hanging
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  });
-
-  return transporter;
+  resendClient = new Resend(process.env.RESEND_API_KEY);
+  return resendClient;
 };
 
 /**
- * Sends the admin invite link to the invited person's email.
- * Fails loudly (throws) so the caller can decide how to handle it -
- * e.g. log it and still let the invite be created (fail-open), the
- * same philosophy used for officer invite SMS.
+ * Sends the admin invite link to the invited person's email via Resend's
+ * HTTP API. This avoids SMTP entirely, which is blocked on Render's free
+ * tier - Resend works over normal HTTPS instead.
+ *
+ * Uses Resend's default testing sender address until a custom domain
+ * is verified on the Resend account.
  */
 export const sendAdminInviteEmail = async (
   toEmail,
   invitedName,
   inviteLink,
 ) => {
-  const mailer = getTransporter();
+  const resend = getClient();
 
-  const mailOptions = {
-    from: `"CivicSense" <${process.env.GMAIL_USER}>`,
+  const { data, error } = await resend.emails.send({
+    from: "CivicSense <onboarding@resend.dev>",
     to: toEmail,
     subject: "You've been invited to CivicSense as an Admin",
     html: `
@@ -58,8 +46,11 @@ export const sendAdminInviteEmail = async (
         <p style="font-size: 13px; color: #888;">This link expires in 72 hours and can only be used once. If you weren't expecting this invite, you can safely ignore this email.</p>
       </div>
     `,
-  };
+  });
 
-  const info = await mailer.sendMail(mailOptions);
-  return { success: true, messageId: info.messageId };
+  if (error) {
+    throw new Error(error.message || "Resend API error");
+  }
+
+  return { success: true, messageId: data?.id };
 };
