@@ -25,7 +25,11 @@ export default function Settings() {
 
   const [adminInvites, setAdminInvites] = useState([]);
   const [adminList, setAdminList] = useState([]);
-  const [inviteForm, setInviteForm] = useState({ invitedName: "", label: "" });
+  const [inviteForm, setInviteForm] = useState({
+    invitedName: "",
+    email: "",
+    label: "",
+  });
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
 
   const fetchAdminInvites = async () => {
@@ -73,8 +77,12 @@ export default function Settings() {
 
       const inviteLink = `${window.location.origin}/admin-setup?token=${data.token}`;
       await navigator.clipboard.writeText(inviteLink).catch(() => {});
-      toast.success("Invite created! Link copied to clipboard.");
-      setInviteForm({ invitedName: "", label: "" });
+      toast.success(
+        data.emailSent
+          ? "Invite created and emailed!"
+          : "Invite created! Link copied to clipboard.",
+      );
+      setInviteForm({ invitedName: "", email: "", label: "" });
       fetchAdminInvites();
     } catch (err) {
       toast.error(err.message);
@@ -234,6 +242,24 @@ export default function Settings() {
                   </div>
                   <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
                     <label className="text-xs text-gray-400">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={inviteForm.email}
+                      onChange={(e) =>
+                        setInviteForm({
+                          ...inviteForm,
+                          email: e.target.value,
+                        })
+                      }
+                      className="bg-[#0F172A] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                      placeholder="priya@example.com"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
+                    <label className="text-xs text-gray-400">
                       Label (optional)
                     </label>
                     <input
@@ -255,7 +281,7 @@ export default function Settings() {
                 </form>
                 <p className="text-gray-500 text-xs mt-3">
                   Invite links expire after 72 hours and can only be used once.
-                  The link is copied to your clipboard automatically.
+                  The invite is emailed automatically to the address you enter.
                 </p>
 
                 {adminInvites.length > 0 && (
