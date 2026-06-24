@@ -155,6 +155,16 @@ export const startEscalationJob = () => {
             complaint.assignedTo = newOfficer.officerId;
             complaint.assignedAt = new Date(); // ✅ reset assignedAt so 100% block measures from reassignment
             complaint.status = "assigned";
+            // ADDED: deadline was never extended on reassignment, so the next escalation
+            // check (15 min later) would see now > deadline almost immediately and
+            // force-escalate the complaint again even though the new officer just got it.
+            // Recalculate deadline from the fresh assignedAt, same as initial auto-assign.
+            if (complaint.deadlineHours) {
+              complaint.deadline = new Date(
+                complaint.assignedAt.getTime() +
+                  complaint.deadlineHours * 60 * 60 * 1000,
+              );
+            }
             // ✅ reset reminder flags for new officer's fresh deadline window
             complaint.reminderSent30 = false;
             complaint.reminderSent60 = false;
