@@ -1,6 +1,24 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 
+// ─────────────────────────────────────────────────────────────
+// EMAILJS SETUP (one-time, ~2 minutes):
+//
+// 1. Go to https://www.emailjs.com and create a free account
+// 2. Add a Gmail service → connect civicsense09@gmail.com
+//    → copy the Service ID (looks like "service_xxxxxxx")
+// 3. Create an Email Template with these variables:
+//      {{from_name}}  {{designation}}  {{district}}
+//      {{department}} {{contact}}
+//    Subject line suggestion: "CivicCall Pilot Request – {{district}}"
+//    → copy the Template ID (looks like "template_xxxxxxx")
+// 4. Go to Account → copy your Public Key
+// 5. Replace the three placeholders below:
+// ─────────────────────────────────────────────────────────────
+const EMAILJS_SERVICE_ID  = "service_m5ctcn4";
+const EMAILJS_TEMPLATE_ID = "template_xo2ug9a";
+const EMAILJS_PUBLIC_KEY = "mx2I35Rx9mbz3YWDx";  // last piece
+
 const STYLES = `
 :root{
   --navy:#0B2447;
@@ -60,6 +78,11 @@ const STYLES = `
 .cc-btn-ghost{color:var(--navy)!important;background:transparent;}
 .cc-btn-solid{color:#FFFFFF!important;background:var(--navy);}
 
+/* FIX: <Link> renders as <a>, so .cc-root a{color:inherit} was overriding the button colors.
+   These explicit a-tag selectors win the specificity battle. */
+a.cc-btn-ghost{color:var(--navy)!important;}
+a.cc-btn-solid{color:#FFFFFF!important;}
+
 .cc-hero{position:relative;overflow:hidden;border-bottom:1px solid var(--paper-line);background:linear-gradient(180deg, #F7F3EA 0%, var(--paper) 100%);}
 .cc-chakra-watermark{position:absolute;right:-180px;top:-160px;width:560px;height:560px;opacity:0.05;animation:cc-spin 90s linear infinite;}
 @keyframes cc-spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
@@ -71,8 +94,12 @@ const STYLES = `
 .cc-hero h1 .cc-hi{display:block;font-family:var(--font-body);font-weight:600;font-size:24px;color:var(--ink-soft);margin-top:8px;}
 .cc-lede{margin-top:18px;font-size:16.5px;color:var(--ink-soft);max-width:480px;}
 .cc-hero-ctas{display:flex;gap:14px;margin-top:30px;}
-.cc-btn-primary-lg{font-family:var(--font-display);font-weight:700;font-size:15px;background:var(--navy);color:#FFFFFF!important;padding:13px 24px;border-radius:3px;border:1.5px solid var(--navy);cursor:pointer;display:inline-block;text-decoration:none;}
-.cc-btn-secondary-lg{font-family:var(--font-display);font-weight:700;font-size:15px;background:transparent;color:var(--navy)!important;padding:13px 24px;border-radius:3px;border:1.5px solid var(--gold-line);cursor:pointer;display:inline-block;text-decoration:none;}
+.cc-btn-primary-lg{font-family:var(--font-display);font-weight:700;font-size:15px;background:var(--navy);color:#FFFFFF!important;padding:13px 24px;border-radius:3px;border:1.5px solid var(--navy);cursor:pointer;display:inline-block;text-decoration:none!important;}
+.cc-btn-secondary-lg{font-family:var(--font-display);font-weight:700;font-size:15px;background:transparent;color:var(--navy)!important;padding:13px 24px;border-radius:3px;border:1.5px solid var(--gold-line);cursor:pointer;display:inline-block;text-decoration:none!important;}
+
+/* FIX: explicit a-tag selectors for hero CTA buttons */
+a.cc-btn-primary-lg{color:#FFFFFF!important;text-decoration:none!important;}
+a.cc-btn-secondary-lg{color:var(--navy)!important;text-decoration:none!important;}
 
 .cc-pipeline-card{background:var(--navy-deep);border-radius:6px;padding:26px 22px;position:relative;border:1px solid rgba(255,255,255,0.06);box-shadow:0 18px 40px -16px rgba(11,36,71,0.45);}
 .cc-pipeline-title{font-family:var(--font-mono);font-size:11px;color:#9FB4D6;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:18px;display:flex;justify-content:space-between;}
@@ -175,7 +202,12 @@ const STYLES = `
 .cc-cta-form .cc-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .cc-cta-form input{padding:10px 12px;border:1px solid rgba(255,255,255,0.15);border-radius:3px;background:rgba(255,255,255,0.06);color:#fff;font-family:var(--font-body);font-size:14px;}
 .cc-cta-form input::placeholder{color:#8DA0BD;}
-.cc-cta-form button{font-family:var(--font-display);font-weight:700;font-size:14.5px;background:var(--saffron);color:var(--navy-deep);padding:12px;border-radius:3px;border:none;cursor:pointer;margin-top:4px;}
+.cc-cta-form button{font-family:var(--font-display);font-weight:700;font-size:14.5px;background:var(--saffron);color:var(--navy-deep);padding:12px;border-radius:3px;border:none;cursor:pointer;margin-top:4px;transition:opacity 0.2s;}
+.cc-cta-form button:disabled{opacity:0.6;cursor:not-allowed;}
+
+/* Pilot form status messages */
+.cc-form-success{background:rgba(19,136,8,0.15);border:1px solid rgba(19,136,8,0.4);border-radius:4px;padding:12px 16px;font-family:var(--font-mono);font-size:13px;color:#7FD878;text-align:center;}
+.cc-form-error{background:rgba(220,50,50,0.15);border:1px solid rgba(220,50,50,0.4);border-radius:4px;padding:12px 16px;font-family:var(--font-mono);font-size:13px;color:#FF9999;text-align:center;}
 
 .cc-footer{background:var(--navy-deep);color:#AEC0DD;padding:48px 0 24px;}
 .cc-footer-top{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;padding-bottom:32px;border-bottom:1px solid rgba(255,255,255,0.08);}
@@ -291,22 +323,8 @@ const Icon = {
 function CivicSeal() {
   return (
     <svg className="cc-seal" viewBox="0 0 100 100">
-      <circle
-        cx="50"
-        cy="50"
-        r="46"
-        fill="none"
-        stroke="#0B2447"
-        strokeWidth="2"
-      />
-      <circle
-        cx="50"
-        cy="50"
-        r="38"
-        fill="none"
-        stroke="#FF9933"
-        strokeWidth="1"
-      />
+      <circle cx="50" cy="50" r="46" fill="none" stroke="#0B2447" strokeWidth="2" />
+      <circle cx="50" cy="50" r="38" fill="none" stroke="#FF9933" strokeWidth="1" />
       <g stroke="#0B2447" strokeWidth="1">
         {Array.from({ length: 24 }).map((_, i) => {
           const angle = (i * 360) / 24;
@@ -319,26 +337,10 @@ function CivicSeal() {
         })}
       </g>
       <circle cx="50" cy="50" r="6" fill="#0B2447" />
-      <text
-        x="50"
-        y="14"
-        textAnchor="middle"
-        fontSize="6"
-        fontFamily="JetBrains Mono"
-        fill="#0B2447"
-        letterSpacing="1"
-      >
+      <text x="50" y="14" textAnchor="middle" fontSize="6" fontFamily="JetBrains Mono" fill="#0B2447" letterSpacing="1">
         PROPOSED FOR BIHAR
       </text>
-      <text
-        x="50"
-        y="93"
-        textAnchor="middle"
-        fontSize="6"
-        fontFamily="JetBrains Mono"
-        fill="#0B2447"
-        letterSpacing="1"
-      >
+      <text x="50" y="93" textAnchor="middle" fontSize="6" fontFamily="JetBrains Mono" fill="#0B2447" letterSpacing="1">
         CIVICCALL
       </text>
     </svg>
@@ -349,14 +351,7 @@ function ChakraWatermark({ style }) {
   const spokeAngles = Array.from({ length: 8 }).map((_, i) => i * 22.5);
   return (
     <svg className="cc-chakra-watermark" style={style} viewBox="0 0 200 200">
-      <circle
-        cx="100"
-        cy="100"
-        r="95"
-        fill="none"
-        stroke="#0B2447"
-        strokeWidth="1.5"
-      />
+      <circle cx="100" cy="100" r="95" fill="none" stroke="#0B2447" strokeWidth="1.5" />
       <circle cx="100" cy="100" r="10" fill="#0B2447" />
       <g stroke="#0B2447" strokeWidth="1.5">
         {spokeAngles.map((angle, i) => {
@@ -464,6 +459,37 @@ const SECURITY_CARDS = [
   },
 ];
 
+// ─────────────────────────────────────────────────────────────
+// EmailJS sender — calls EmailJS REST API directly (no SDK needed)
+// ─────────────────────────────────────────────────────────────
+async function sendPilotEmail(formData) {
+  const payload = {
+    service_id: EMAILJS_SERVICE_ID,
+    template_id: EMAILJS_TEMPLATE_ID,
+    user_id: EMAILJS_PUBLIC_KEY,
+    template_params: {
+      to_email: "civicsense09@gmail.com",
+      from_name: formData.name,
+      designation: formData.designation,
+      district: formData.district,
+      department: formData.department,
+      contact: formData.contact,
+      submitted_at: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+    },
+  };
+
+  const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "EmailJS request failed");
+  }
+}
+
 export default function Landing() {
   const [form, setForm] = useState({
     name: "",
@@ -472,6 +498,34 @@ export default function Landing() {
     department: "",
     contact: "",
   });
+
+  // "idle" | "sending" | "success" | "error"
+  const [submitState, setSubmitState] = useState("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handlePilotSubmit = async (e) => {
+    e.preventDefault();
+
+    // Basic validation
+    if (!form.name || !form.district || !form.contact) {
+      setErrorMsg("Please fill in Name, District, and Contact before submitting.");
+      setSubmitState("error");
+      return;
+    }
+
+    setSubmitState("sending");
+    setErrorMsg("");
+
+    try {
+      await sendPilotEmail(form);
+      setSubmitState("success");
+      setForm({ name: "", designation: "", district: "", department: "", contact: "" });
+    } catch (err) {
+      console.error("Pilot form error:", err);
+      setErrorMsg("Could not send your request right now. Please email us directly at civicsense09@gmail.com");
+      setSubmitState("error");
+    }
+  };
 
   return (
     <div className="cc-root">
@@ -796,52 +850,62 @@ export default function Landing() {
               district.
             </p>
           </div>
-          <form
-            className="cc-cta-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              alert("Thank you. Our team will reach out shortly.");
-            }}
-          >
-            <div className="cc-row">
-              <input
-                type="text"
-                placeholder="Officer Name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder="Designation"
-                value={form.designation}
-                onChange={(e) =>
-                  setForm({ ...form, designation: e.target.value })
-                }
-              />
-            </div>
-            <div className="cc-row">
-              <input
-                type="text"
-                placeholder="District"
-                value={form.district}
-                onChange={(e) => setForm({ ...form, district: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder="Department"
-                value={form.department}
-                onChange={(e) =>
-                  setForm({ ...form, department: e.target.value })
-                }
-              />
-            </div>
-            <input
-              type="text"
-              placeholder="Official Email / Phone"
-              value={form.contact}
-              onChange={(e) => setForm({ ...form, contact: e.target.value })}
-            />
-            <button type="submit">Propose a Pilot</button>
+
+          <form className="cc-cta-form" onSubmit={handlePilotSubmit}>
+            {submitState === "success" ? (
+              <div className="cc-form-success">
+                ✓ Request received. We'll reach out to you shortly at the contact you provided.
+              </div>
+            ) : (
+              <>
+                <div className="cc-row">
+                  <input
+                    type="text"
+                    placeholder="Officer Name *"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Designation"
+                    value={form.designation}
+                    onChange={(e) => setForm({ ...form, designation: e.target.value })}
+                  />
+                </div>
+                <div className="cc-row">
+                  <input
+                    type="text"
+                    placeholder="District *"
+                    value={form.district}
+                    onChange={(e) => setForm({ ...form, district: e.target.value })}
+                    required
+                  />
+                  <input
+                    type="text"
+                    placeholder="Department"
+                    value={form.department}
+                    onChange={(e) => setForm({ ...form, department: e.target.value })}
+                  />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Official Email / Phone *"
+                  value={form.contact}
+                  onChange={(e) => setForm({ ...form, contact: e.target.value })}
+                  required
+                />
+                {submitState === "error" && (
+                  <div className="cc-form-error">{errorMsg}</div>
+                )}
+                <button
+                  type="submit"
+                  disabled={submitState === "sending"}
+                >
+                  {submitState === "sending" ? "Sending…" : "Propose a Pilot"}
+                </button>
+              </>
+            )}
           </form>
         </div>
       </section>
@@ -863,9 +927,9 @@ export default function Landing() {
           </div>
           <div className="cc-footer-col">
             <h5>Contact</h5>
-            <a href="#">Helpline: 1800-345-6116</a>
-            <a href="#">support@civiccall.gov.in</a>
-            <a href="#">Dept. of IT, Govt. of Bihar</a>
+            <a href="#">Helpline: 1857-855-6170</a>
+            <a href="#">civicsense09@gmail.com</a>
+            <a href="#">Dept. of IT, Govt.</a>
           </div>
           <div className="cc-footer-col">
             <h5>Accessibility</h5>
@@ -880,8 +944,7 @@ export default function Landing() {
         <div className="cc-container cc-footer-bottom">
           <span>
             CivicCall is a civic-tech platform proposed for adoption under Govt.
-            of e-Governance Mission. Not yet an official government
-            system.
+            of e-Governance Mission. Not yet an official government system.
           </span>
           <span>
             Last Updated: 22 June 2026 · Best viewed in 1280×800 resolution
