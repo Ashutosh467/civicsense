@@ -4,6 +4,7 @@ import { getIO } from "../sockets/socket.js";
 import { processComplaint } from "../services/aiService.js";
 import axios from "axios";
 import { assignComplaintToOfficer } from "../services/assignService.js";
+import { checkAndTrackSpam } from "../services/spamCheck.js"; // ADDED: wire up caller trust tracking
 
 /*
 =============================
@@ -56,6 +57,17 @@ export const createComplaint = async (req, res) => {
     if (isDuplicate) urgency = "high";
     if (aiResult.urgencyOverride === "HIGH") urgency = "high";
 
+    // ADDED: actually run caller trust/spam tracking (was previously defined but never called)
+    let spamResult = { isSpam: false, blacklisted: false };
+    if (callerNo && callerNo !== "Unknown") {
+      try {
+        spamResult = await checkAndTrackSpam(callerNo);
+      } catch (err) {
+        console.error("checkAndTrackSpam error:", err.message);
+      }
+    }
+    if (spamResult.isSpam) urgency = "low"; // ADDED: de-prioritize likely-spam callers
+
     // 4. SAVE with all fields
     const urgencyScore = req.body.urgencyScore || 5;
     const deadlineHours = req.body.deadlineHours || 72;
@@ -85,7 +97,11 @@ export const createComplaint = async (req, res) => {
       deadlineStatus: "active",
       audioEmotionScore: req.body.audioEmotionScore || 0,
       audioOverride: req.body.audioOverride || false,
-      trustScoreAtTime: req.body.trustScoreAtTime || 50,
+      // ADDED: use the real tracked trust score instead of a hardcoded default
+      trustScoreAtTime:
+        spamResult.trustScore ?? req.body.trustScoreAtTime ?? 50,
+      isSpamFlagged: spamResult.isSpam || false, // ADDED
+      callerBlacklisted: spamResult.blacklisted || false, // ADDED
     });
 
     try {

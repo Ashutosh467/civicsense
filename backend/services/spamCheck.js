@@ -13,11 +13,16 @@ export const checkAndTrackSpam = async (phone) => {
       lastHourWindow: now,
       lastComplaintAt: now,
     });
-    return { isSpam: false, blacklisted: false };
+    return { isSpam: false, blacklisted: false, trustScore: caller.trustScore };
   }
 
   if (caller.blacklisted) {
-    return { isSpam: true, blacklisted: true, reason: caller.blacklistReason };
+    return {
+      isSpam: true,
+      blacklisted: true,
+      reason: caller.blacklistReason,
+      trustScore: caller.trustScore,
+    };
   }
 
   if (!caller.lastHourWindow || caller.lastHourWindow < oneHourAgo) {
@@ -31,5 +36,5 @@ export const checkAndTrackSpam = async (phone) => {
   await caller.save();
 
   const isSpam = caller.complaintsLastHour > 3;
-  return { isSpam, blacklisted: false };
+  return { isSpam, blacklisted: false, trustScore: caller.trustScore };
 };
