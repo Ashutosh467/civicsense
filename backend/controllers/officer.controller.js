@@ -154,10 +154,15 @@ export const autoAssignComplaint = async (req, res) => {
 export const resolveComplaint = async (req, res) => {
   try {
     const { complaintId } = req.params;
-    const { officerId, resolutionNote, resolutionPhoto } = req.body;
+    const { resolutionNote, resolutionPhoto } = req.body;
 
     const complaint = await Complaint.findById(complaintId);
     if (!complaint) return res.status(404).json({ message: "Complaint not found" });
+
+    // FIX: verify the logged-in officer is actually assigned to this complaint
+    if (complaint.assignedTo !== req.officer.officerId) {
+      return res.status(403).json({ message: "You can only resolve complaints assigned to you." });
+    }
 
     complaint.status = "resolved";
     complaint.resolvedAt = new Date();
@@ -166,7 +171,8 @@ export const resolveComplaint = async (req, res) => {
 
     await complaint.save();
 
-    const officer = await Officer.findOne({ officerId });
+    // Use verified officer from token, not from request body
+    const officer = await Officer.findOne({ officerId: req.officer.officerId });
     if (officer) {
       officer.activeComplaintsCount = Math.max(0, officer.activeComplaintsCount - 1);
       await officer.save();
@@ -188,7 +194,6 @@ export const resolveComplaint = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
 // 6. GET getOfficerComplaints
 export const getOfficerComplaints = async (req, res) => {
   try {
