@@ -65,7 +65,8 @@ const sendOfficerAssignedSMS = async (
   officerId,
 ) => {
   try {
-    const dashboardLink = `${process.env.MAIN_BACKEND_URL}/officer/${officerId}`;
+    // FIX: use FRONTEND_URL instead of MAIN_BACKEND_URL so the link actually opens the officer dashboard
+    const dashboardLink = `${process.env.FRONTEND_URL || process.env.MAIN_BACKEND_URL}/officer/${officerId}`;
     const message = `CivicCall Alert: Hi ${officerName}, new complaint assigned. Issue: ${issueType} at ${location}. Open: ${dashboardLink}`;
     const result = await sendSMS(officerPhone, message);
     console.log("✅ Officer SMS sent to", officerPhone, result);
@@ -99,6 +100,7 @@ const checkBalance = async () => {
   }
 };
 module.exports = {
+  sendSMS, // ADDED: was used in server.js but never exported, causing ReferenceError
   sendComplaintReceivedSMS,
   sendComplaintResolvedSMS,
   sendOfficerAssignedSMS,

@@ -6,6 +6,7 @@ const twilio = require("twilio");
 const axios = require("axios");
 
 const {
+  sendSMS, // ADDED: needed by officer-escalated and officer-reminder routes below
   sendComplaintReceivedSMS,
   sendComplaintResolvedSMS,
   sendOfficerAssignedSMS,
@@ -285,6 +286,28 @@ app.post("/sms/officer-invite", async (req, res) => {
     officerPhone,
     officerName,
     inviteLink,
+  );
+  res.status(result.success ? 200 : 500).json(result);
+});
+// ADDED: this route was being called by backend/controllers/officer.controller.js
+// (autoAssignComplaint and the 80%-deadline reassignment in escalation.job.js) but
+// never actually existed here — every officer-assignment SMS was silently 404ing.
+app.post("/sms/officer-assigned", async (req, res) => {
+  if (req.headers["x-internal-key"] !== process.env.INTERNAL_SECRET) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  const { officerPhone, officerName, issueType, location, officerId } = req.body;
+  if (!officerPhone || !officerName || !officerId) {
+    return res
+      .status(400)
+      .json({ error: "Missing officerPhone, officerName, or officerId" });
+  }
+  const result = await sendOfficerAssignedSMS(
+    officerPhone,
+    officerName,
+    issueType,
+    location,
+    officerId,
   );
   res.status(result.success ? 200 : 500).json(result);
 });
