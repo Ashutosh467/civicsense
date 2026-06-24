@@ -120,8 +120,13 @@ export const startEscalationJob = () => {
           await complaint.save();
 
           const currentOfficerId = complaint.assignedTo;
+          // FIX: this query was missing isArchived and approvalStatus filters that the
+          // normal auto-assign query (assignService.js) already enforces — an archived
+          // or still-pending officer could otherwise be picked up during reassignment.
           const newOfficer = await Officer.findOne({
             isAvailable: true,
+            isArchived: { $ne: true },
+            approvalStatus: "approved",
             officerId: { $ne: currentOfficerId },
             department: complaint.department,
           });
