@@ -109,6 +109,16 @@ export const autoAssignComplaint = async (req, res) => {
     complaint.assignedTo = bestOfficer.officerId;
     complaint.assignedAt = new Date();
     complaint.status = "assigned";
+    // ADDED: deadline was originally calculated from complaint creation time, but the
+    // escalation job measures percentElapsed from assignedAt. If a complaint sits
+    // unassigned for a while, that mismatch makes percentElapsed jump ahead immediately
+    // on assignment. Recompute deadline from the real assignedAt so the window is correct.
+    if (complaint.deadlineHours) {
+      complaint.deadline = new Date(
+        complaint.assignedAt.getTime() +
+          complaint.deadlineHours * 60 * 60 * 1000,
+      );
+    }
     await complaint.save();
 
     // Update officer
@@ -174,7 +184,34 @@ export const resolveComplaint = async (req, res) => {
     // Use verified officer from token, not from request body
     const officer = await Officer.findOne({ officerId: req.officer.officerId });
     if (officer) {
-      officer.activeComplaintsCount = Math.max(0, officer.activeComplaintsCount - 1);
+      officer.activeComplaintsCount = Math.max(
+        0,
+        officer.activeComplaintsCount - 1,
+      );
+
+      // ADDED: reward trust score on resolution so it isn't a one-way penalty system.
+      // Resolving before the 60% reminder fired counts as "on time" (+5),
+      // resolving after counts as "late but resolved" (+2).
+      const resolvedOnTime = !complaint.reminderSent60;
+      officer.trustScore = Math.min(
+        100,
+        (officer.trustScore || 70) + (resolvedOnTime ? 5 : 2),
+      );
+      officer.totalResolved = (officer.totalResolved || 0) + 1;
+
+      // ADDED: track average resolution time (in hours) using assignedAt -> resolvedAt
+      const assignedAt = complaint.assignedAt || complaint.time;
+      if (assignedAt) {
+        const resolutionHours =
+          (complaint.resolvedAt - new Date(assignedAt)) / (1000 * 60 * 60);
+        const prevAvg = officer.averageResolutionHours || 0;
+        const prevCount = officer.totalResolved - 1;
+        officer.averageResolutionHours =
+          prevCount > 0
+            ? (prevAvg * prevCount + resolutionHours) / officer.totalResolved
+            : resolutionHours;
+      }
+
       await officer.save();
     }
 
