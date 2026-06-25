@@ -239,7 +239,7 @@ export default function MapPage() {
         try {
           await new Promise((r) => setTimeout(r, 100));
           const res = await fetch(
-            `http://localhost:10000/api/geocode?location=${encodeURIComponent(zone.location)}`,
+            `${API}/api/geocode?location=${encodeURIComponent(zone.location)}`,
           );
           const data = await res.json();
           if (data && data.lat !== null && data.lon !== null) {
