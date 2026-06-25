@@ -88,7 +88,9 @@ export default function LocationMap() {
                 } else {
                     try {
                         await new Promise((r) => setTimeout(r, 300));
-                        const res = await fetch(`http://localhost:10000/api/geocode?location=${encodeURIComponent(zone.location)}`);
+                        const res = await fetch(
+                          `${API}/api/geocode?location=${encodeURIComponent(zone.location)}`,
+                        );
                         const data = await res.json();
 
                         if (data && data.lat !== null && data.lon !== null) {
